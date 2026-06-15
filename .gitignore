@@ -1,0 +1,28 @@
+# Internal planning and tooling, not for the public repo
+PLAN.md
+.claude/
+.firecrawl/
+memory/
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Move build output
+build/
+**/build/
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Editor and OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

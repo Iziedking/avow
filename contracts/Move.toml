@@ -1,0 +1,12 @@
+[package]
+name = "avow"
+edition = "2024"
+
+# Recent Sui toolchains inject the Sui framework and the Move standard library as
+# implicit system dependencies, so no explicit [dependencies] block is required here.
+# If `sui move build` cannot resolve `sui::...` or `std::...`, generate a fresh scaffold
+# with `sui move new avow`, copy its generated [dependencies] block here, and drop these
+# sources into `sources/`.
+
+[addresses]
+avow = "0x0"

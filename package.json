@@ -1,0 +1,12 @@
+{
+  "name": "avow",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Avow: a verifiable trust layer that any money-moving agent on Sui can plug into to make its actions provable.",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}

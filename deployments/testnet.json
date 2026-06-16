@@ -1,0 +1,9 @@
+{
+  "network": "testnet",
+  "packageId": "0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e",
+  "modules": ["mandate", "record"],
+  "upgradeCap": "0xb6930389cdcab21aedf9de624ed97c5f6094be079bb9d50a1132ca8bd66cb4a9",
+  "publisher": "0xc11c77d7f5f0555041e04a89a266edbe305da731c4f10c102bc4384536bbb65b",
+  "publishTx": "CbhJguh1Woe4c9hboiBTKdTkncTBhqWXYMsPZdqaTYBH",
+  "publishedAt": "2026-06-16"
+}

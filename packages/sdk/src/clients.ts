@@ -9,7 +9,7 @@
 import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { SealClient } from "@mysten/seal";
 import { WalrusClient } from "@mysten/walrus";
-import { NETWORK, SEAL_KEY_SERVERS } from "./config";
+import { NETWORK, SEAL_KEY_SERVERS, WALRUS_UPLOAD_RELAY, WALRUS_TIP_MAX_MIST } from "./config";
 
 export function getSuiClient(): SuiJsonRpcClient {
   return new SuiJsonRpcClient({
@@ -32,5 +32,9 @@ export function getWalrusClient(suiClient: SuiJsonRpcClient): WalrusClient {
   return new WalrusClient({
     network: NETWORK,
     suiClient,
+    uploadRelay: {
+      host: WALRUS_UPLOAD_RELAY,
+      sendTip: { max: WALRUS_TIP_MAX_MIST },
+    },
   });
 }

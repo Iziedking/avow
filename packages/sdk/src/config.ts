@@ -39,6 +39,16 @@ export const SEAL_THRESHOLD = 2;
 // How long evidence blobs are stored on Walrus, in epochs. A testnet epoch is about a day.
 export const WALRUS_EPOCHS = 5;
 
+// Writes go through Mysten's upload relay rather than fanning out to many storage nodes
+// directly, which is far more reliable from a single machine. Source: Walrus network
+// reference, upload relays. sendTip caps what we pay the relay, in MIST.
+export const WALRUS_UPLOAD_RELAY =
+  NETWORK === "mainnet"
+    ? "https://upload-relay.mainnet.walrus.space"
+    : "https://upload-relay.testnet.walrus.space";
+
+export const WALRUS_TIP_MAX_MIST = 1_000_000;
+
 // Unit conversions.
 export const MIST_PER_SUI = 1_000_000_000n;
 export const FROST_PER_WAL = 1_000_000_000n;

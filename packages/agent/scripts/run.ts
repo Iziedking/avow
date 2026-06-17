@@ -5,16 +5,9 @@
 
 import { readFileSync } from "node:fs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { getSuiClient, getSealClient, getWalrusClient, NETWORK } from "avow-sdk";
+import { getSuiClient, getSealClient, getWalrusClient, createMandate, NETWORK } from "avow-sdk";
 import { LocalMoneyLayer } from "../src/local-money";
 import { runCycle } from "../src/agent";
-
-const MANDATE_ID =
-  process.env.AVOW_MANDATE_ID ??
-  "0x0f893eb746e08ae348d1389f3c633b282966218e784e8f142bf0acaa60184c11";
-const ACCESS_ID =
-  process.env.AVOW_ACCESS_ID ??
-  "0x8f11810dabe1717db797bbb15afbcb21072fe56d3b8198213e4608a67d719ec1";
 
 function loadDevKeypair(): Ed25519Keypair {
   // A fresh user sets AVOW_KEY to their own Sui private key. The .firecrawl fallback is only
@@ -37,6 +30,24 @@ async function main() {
   const sealClient = getSealClient(suiClient);
   const walrusClient = getWalrusClient(suiClient);
 
+  // Use a mandate from the environment, or create one naming this wallet as the agent. The
+  // contract only lets the named agent anchor, so the agent has to own its own mandate.
+  let mandateId = process.env.AVOW_MANDATE_ID;
+  let accessId = process.env.AVOW_ACCESS_ID;
+  if (!mandateId || !accessId) {
+    console.log("no mandate set, creating one for this agent...");
+    const created = await createMandate(suiClient, keypair, {
+      agent: address,
+      perMoveCap: 1_000_000n,
+      dailyCap: 10_000_000n,
+      expiryEpoch: 100_000n,
+    });
+    mandateId = created.mandateId;
+    accessId = created.accessId;
+    console.log(`mandate: ${mandateId}`);
+    console.log(`access:  ${accessId}`);
+  }
+
   const money = new LocalMoneyLayer(suiClient, keypair, address, {
     target: "idle",
     amount: "500000",
@@ -53,8 +64,8 @@ async function main() {
     walrusClient,
     signer: keypair,
     agentAddress: address,
-    mandateId: MANDATE_ID,
-    accessId: ACCESS_ID,
+    mandateId,
+    accessId,
     money,
     thresholdBps: 50,
   });

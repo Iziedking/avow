@@ -10,6 +10,7 @@ import { fetchRecords, fetchAccessId, type AnchoredRecord } from "./records";
 import { findCapForMandate } from "./caps";
 import { setupMandate } from "./setup";
 import { verifyRecord } from "./verify";
+import { Intro } from "./intro/Intro";
 import { DEMO_MANDATE_ID, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
 type VerifyStatus = "idle" | "running" | "ok" | "fail";
@@ -72,6 +73,14 @@ export function App() {
     result?: { mandateId: string; accessId: string; capId: string };
     error?: string;
   }>({ status: "idle" });
+
+  const [showIntro, setShowIntro] = useState(() => {
+    try {
+      return sessionStorage.getItem("avow-intro") !== "done";
+    } catch {
+      return true;
+    }
+  });
 
   const account = useCurrentAccount();
   const { mutateAsync: signPersonalMessage } = useSignPersonalMessage();
@@ -178,7 +187,20 @@ export function App() {
   const totalMoved = records.reduce((sum, r) => sum + BigInt(r.amount || "0"), 0n);
 
   return (
-    <div className="page">
+    <>
+      {showIntro && (
+        <Intro
+          onDone={() => {
+            try {
+              sessionStorage.setItem("avow-intro", "done");
+            } catch {
+              /* storage unavailable */
+            }
+            setShowIntro(false);
+          }}
+        />
+      )}
+      <div className="page">
       <header className="masthead">
         <div className="masthead-top">
           <div className="brand">
@@ -191,11 +213,42 @@ export function App() {
           <ConnectButton />
         </div>
         <p className="lede">
-          The track record of an autonomous agent on Sui. Every move it made is anchored on
-          chain and provable. <strong>Connect a wallet you authorized</strong> to decrypt the
-          evidence and watch each move verify against its anchor.
+          Money-moving AI agents ask you to trust their numbers. Avow makes them{" "}
+          <strong>prove</strong> them. Every move an agent makes is locked away on Walrus and
+          stamped on chain, so you, or anyone you allow, can check exactly what it did and that
+          it stayed within the limits you set.
         </p>
       </header>
+
+      <section className="how">
+        <div className="how-step">
+          <span className="how-n">1</span>
+          <div>
+            <h3>You set the rules</h3>
+            <p>Decide what your agent may do: how much it can move, where, and for how long.</p>
+          </div>
+        </div>
+        <div className="how-step">
+          <span className="how-n">2</span>
+          <div>
+            <h3>The agent acts, and proves it</h3>
+            <p>
+              After each move it seals the details and stamps a proof on chain. A move that
+              breaks your rules cannot produce a proof.
+            </p>
+          </div>
+        </div>
+        <div className="how-step">
+          <span className="how-n">3</span>
+          <div>
+            <h3>Anyone you allow can check</h3>
+            <p>
+              Open a proof, unlock the details, and confirm it is real and within your rules.
+              No trust required.
+            </p>
+          </div>
+        </div>
+      </section>
 
       <section className="finder">
         <label className="label" htmlFor="mandate">
@@ -406,6 +459,7 @@ export function App() {
         decrypt it. The hash recomputed from that evidence has to match what was anchored on
         chain, or the record does not verify.
       </footer>
-    </div>
+      </div>
+    </>
   );
 }

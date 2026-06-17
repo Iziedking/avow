@@ -20,6 +20,7 @@
 
   --serif: "Fraunces Variable", "Fraunces", Georgia, "Times New Roman", serif;
   --sans: "Saira Variable", "Saira", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --display: "Orbitron Variable", "Orbitron", var(--sans);
   --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 }
 
@@ -117,17 +118,21 @@ button {
   }
 }
 
+/* Four big faded monograms in the outer background, two left and two right, the way the
+   wallet sheet floats its doodles. Kept off the reading column. */
 .watermark {
   position: fixed;
-  right: -70px;
-  bottom: 36px;
-  width: 540px;
-  height: 540px;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.028;
-  background: center / contain no-repeat url("./watermark.svg");
-  animation: wmFloat 14s ease-in-out infinite;
+  opacity: 0.05;
+  background-image:
+    url("./watermark.svg"), url("./watermark.svg"),
+    url("./watermark.svg"), url("./watermark.svg");
+  background-repeat: no-repeat;
+  background-position: -5% 15%, -4% 76%, 104% 13%, 103% 74%;
+  background-size: 440px, 400px, 410px, 460px;
+  animation: wmFloat 16s ease-in-out infinite;
 }
 
 @keyframes wmFloat {
@@ -135,7 +140,16 @@ button {
     transform: translateY(0);
   }
   50% {
-    transform: translateY(-14px);
+    transform: translateY(-10px);
+  }
+}
+
+@media (max-width: 900px) {
+  /* On narrow screens the column fills the width, so push the marks further out. */
+  .watermark {
+    opacity: 0.04;
+    background-position: -16% 16%, -14% 78%, 114% 14%, 112% 76%;
+    background-size: 300px, 280px, 300px, 300px;
   }
 }
 
@@ -195,7 +209,7 @@ button {
 }
 
 .brand-mark {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-weight: 400;
   font-size: 46px;
   line-height: 0.92;
@@ -244,7 +258,7 @@ button {
 }
 
 .how-n {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 24px;
   line-height: 1;
   color: var(--green);
@@ -430,7 +444,7 @@ input:focus {
 
 .stat-num {
   display: block;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 38px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -469,7 +483,7 @@ input:focus {
 }
 
 .records-title {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 22px;
 }
 
@@ -687,7 +701,7 @@ input:focus {
 }
 
 .neon-wordmark {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 46px;
   line-height: 0.9;
   letter-spacing: -0.01em;
@@ -858,7 +872,7 @@ input:focus {
 
 .wc-modal {
   position: relative;
-  width: min(840px, 96vw);
+  width: min(680px, 96vw);
   background: var(--ink-850);
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -976,7 +990,7 @@ input:focus {
 .wc-pane-link {
   position: relative;
   display: flex;
-  min-height: 380px;
+  min-height: 520px;
   background: var(--ink-900);
   border-left: 1px solid var(--line);
   overflow: hidden;
@@ -1361,7 +1375,7 @@ body::before {
 
 .doc-brand-mark {
   display: block;
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 24px;
   line-height: 1;
   letter-spacing: -0.01em;
@@ -1454,7 +1468,7 @@ body::before {
 }
 
 .doc-article h2 {
-  font-family: var(--serif);
+  font-family: var(--display);
   font-size: 28px;
   font-weight: 500;
   margin: 0 0 14px;

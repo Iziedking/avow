@@ -62,7 +62,7 @@ function Mark() {
 
 export function App() {
   const [mandateId, setMandateId] = useState(DEMO_MANDATE_ID);
-  const [input, setInput] = useState(DEMO_MANDATE_ID);
+  const [input, setInput] = useState("");
   const [records, setRecords] = useState<AnchoredRecord[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
@@ -310,13 +310,14 @@ export function App() {
           <input
             id="mandate"
             value={input}
+            placeholder="paste a mandate id  0x…"
             spellCheck={false}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter") setMandateId(input);
+              if (e.key === "Enter" && input.trim()) setMandateId(input.trim());
             }}
           />
-          <button className="btn" onClick={() => setMandateId(input)}>
+          <button className="btn" onClick={() => input.trim() && setMandateId(input.trim())}>
             Load
           </button>
         </div>

@@ -422,7 +422,7 @@ export function App() {
 
       <div className="records-head reveal">
         <span className="records-title">Track record</span>
-        <span className="note">{short(mandateId, 8, 6)}</span>
+        <span className="note mono">{short(mandateId, 8, 6)}</span>
       </div>
 
       {status === "loading" && (

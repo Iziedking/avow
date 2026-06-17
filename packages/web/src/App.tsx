@@ -5,6 +5,7 @@ import {
   useSignAndExecuteTransaction,
 } from "@mysten/dapp-kit";
 import { WalletConnect } from "./WalletConnect";
+import { Docs } from "./Docs";
 import { Transaction } from "@mysten/sui/transactions";
 import { fetchRecords, fetchAccessId, type AnchoredRecord } from "./records";
 import { findCapForMandate } from "./caps";
@@ -83,6 +84,14 @@ export function App() {
     result?: { mandateId: string; accessId: string; capId: string };
     error?: string;
   }>({ status: "idle" });
+
+  const [docsOpen, setDocsOpen] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).has("docs");
+    } catch {
+      return false;
+    }
+  });
 
   const [showIntro, setShowIntro] = useState(() => {
     try {
@@ -515,6 +524,10 @@ export function App() {
             <span className="foot-tag">proof, not trust</span>
           </div>
           <nav className="foot-links">
+            <button className="foot-docs" onClick={() => setDocsOpen(true)}>
+              Docs
+            </button>
+            <span className="foot-dot" />
             <a href="https://github.com/Iziedking/avow" target="_blank" rel="noreferrer">
               GitHub
             </a>
@@ -529,7 +542,9 @@ export function App() {
           </nav>
         </div>
         <div className="foot-dev">
-          <span className="foot-dev-label">Build on it</span>
+          <button className="foot-dev-label" onClick={() => setDocsOpen(true)}>
+            Build on it →
+          </button>
           <div className="foot-cmds">
             <a
               className="foot-cmd"
@@ -555,6 +570,7 @@ export function App() {
         </div>
       </footer>
       </div>
+      <Docs open={docsOpen} onClose={() => setDocsOpen(false)} />
     </>
   );
 }

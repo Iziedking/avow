@@ -91,9 +91,15 @@ button {
 .page {
   position: relative;
   z-index: 1;
-  max-width: 860px;
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 0 24px 120px;
+  padding: 0 40px 120px;
+}
+
+@media (max-width: 700px) {
+  .page {
+    padding: 0 20px 100px;
+  }
 }
 
 /* Backdrop, a live telemetry floor. A faint grid that drifts, and a monogram
@@ -247,7 +253,6 @@ button {
   background: var(--line);
   border: 1px solid var(--line);
   margin-bottom: 40px;
-  animation: rise 0.5s ease 0.08s both;
 }
 
 .how-step {
@@ -255,6 +260,35 @@ button {
   padding: 22px 20px;
   display: flex;
   gap: 14px;
+  animation: drop 0.6s cubic-bezier(0.18, 0.7, 0.2, 1) both;
+}
+
+/* The three steps drop in one after another, 1 then 2 then 3. */
+.how-step:nth-child(1) {
+  animation-delay: 0.15s;
+}
+
+.how-step:nth-child(2) {
+  animation-delay: 0.45s;
+}
+
+.how-step:nth-child(3) {
+  animation-delay: 0.75s;
+}
+
+@keyframes drop {
+  0% {
+    opacity: 0;
+    transform: translateY(-34px);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(4px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .how-n {
@@ -300,6 +334,22 @@ button {
   color: #5a9e77;
   text-shadow: 0 0 6px rgba(95, 208, 138, 0.18);
   margin-bottom: 9px;
+}
+
+.finder-hint {
+  margin: 0 0 12px;
+  max-width: 64ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+.records-intro {
+  margin: 0 0 18px;
+  max-width: 70ch;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
 }
 
 .finder-row {
@@ -516,8 +566,24 @@ input:focus {
 
 .record-top {
   display: flex;
-  align-items: baseline;
-  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+
+.amount-wrap {
+  margin-left: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  line-height: 1.15;
+}
+
+.amount-k {
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
 }
 
 .badge {
@@ -535,7 +601,6 @@ input:focus {
 }
 
 .amount {
-  margin-left: auto;
   font-size: 19px;
   font-variant-numeric: tabular-nums;
   letter-spacing: -0.01em;
@@ -809,8 +874,9 @@ input:focus {
     grid-template-columns: 1fr;
     gap: 10px;
   }
-  .amount {
+  .amount-wrap {
     margin-left: 0;
+    align-items: flex-start;
   }
 }
 

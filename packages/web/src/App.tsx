@@ -35,6 +35,13 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+// Turn a data code like "yield_move" into a readable phrase like "Yield move".
+function prettyAction(type: string): string {
+  if (!type) return "Action";
+  const words = type.replace(/[_-]+/g, " ").trim();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
 function Mark() {
   return (
     <svg viewBox="0 0 512 512" fill="none" aria-hidden="true">
@@ -304,8 +311,12 @@ export function App() {
 
       <section className="finder">
         <label className="label" htmlFor="mandate">
-          Mandate
+          Look up a mandate
         </label>
+        <p className="finder-hint">
+          A mandate is the rulebook an agent runs under. Paste its id to see everything that
+          agent has done.
+        </p>
         <div className="finder-row">
           <input
             id="mandate"
@@ -413,11 +424,11 @@ export function App() {
       <section className="summary hud">
         <div className="stat">
           <span className="stat-num">{moves}</span>
-          <span className="stat-label">moves anchored</span>
+          <span className="stat-label">moves recorded</span>
         </div>
         <div className="stat">
           <span className="stat-num tnum">{group(totalMoved.toString())}</span>
-          <span className="stat-label">total moved · smallest unit</span>
+          <span className="stat-label">total moved, in the token's smallest unit</span>
         </div>
       </section>
 
@@ -425,6 +436,10 @@ export function App() {
         <span className="records-title">Track record</span>
         <span className="note mono">{short(mandateId, 8, 6)}</span>
       </div>
+      <p className="records-intro reveal">
+        Every action this agent has recorded, newest first. Open any one and verify it
+        yourself, you never have to take the numbers on trust.
+      </p>
 
       {status === "loading" && (
         <div className="loading">
@@ -446,43 +461,59 @@ export function App() {
               <div className="record-index tnum">{String(i + 1).padStart(2, "0")}</div>
               <div className="record-main">
                 <div className="record-top">
-                  <span className="badge">{r.actionType || "action"}</span>
-                  <span className="target">{r.target || "-"}</span>
-                  <span className="amount tnum">{group(r.amount)}</span>
-                  <span className={`status${v.status === "ok" ? " is-verified" : ""}`}>
-                    {v.status === "ok" ? "verified" : "anchored"}
+                  <span className="badge">{prettyAction(r.actionType)}</span>
+                  {r.target && <span className="target">to {r.target}</span>}
+                  <span className="amount-wrap">
+                    <span className="amount-k">amount moved</span>
+                    <span className="amount tnum">{group(r.amount)}</span>
+                  </span>
+                  <span
+                    className={`status${v.status === "ok" ? " is-verified" : ""}`}
+                    title={
+                      v.status === "ok"
+                        ? "You verified this record. The evidence is unaltered and within the rules."
+                        : "Sealed and recorded on chain. Verify it to confirm it for yourself."
+                    }
+                  >
+                    {v.status === "ok" ? "Verified" : "Recorded"}
                   </span>
                 </div>
 
                 <div className="record-meta">
-                  <span>
-                    <span className="k">epoch</span>
-                    {r.epoch}
-                  </span>
                   {r.timestampMs ? (
                     <span>
-                      <span className="k">when</span>
+                      <span className="k">recorded</span>
                       {formatTime(r.timestampMs)}
                     </span>
                   ) : null}
-                  <span>
-                    <span className="k">hash</span>
+                  <span title="Sui's clock, where one epoch is roughly a day.">
+                    <span className="k">Sui epoch</span>
+                    {r.epoch}
+                  </span>
+                  <span title="A fingerprint of the sealed evidence. Verifying recomputes it and checks it still matches what was stamped on chain.">
+                    <span className="k">evidence fingerprint</span>
                     {short(r.evidenceHashHex, 10, 8)}
                   </span>
                 </div>
 
                 <div className="record-links">
                   {r.txDigest && (
-                    <a href={`${SUISCAN}/tx/${r.txDigest}`} target="_blank" rel="noreferrer">
-                      anchor tx
+                    <a
+                      href={`${SUISCAN}/tx/${r.txDigest}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Open the Sui transaction that recorded this on chain."
+                    >
+                      View the on-chain record
                     </a>
                   )}
                   <a
                     href={`${WALRUS_AGGREGATOR}/v1/blobs/${r.blobId}`}
                     target="_blank"
                     rel="noreferrer"
+                    title="Open the encrypted evidence on Walrus. It stays unreadable until you verify."
                   >
-                    sealed evidence
+                    Open the sealed evidence
                   </a>
                   <button
                     className="verify-btn"
@@ -490,21 +521,23 @@ export function App() {
                     onClick={() => onVerify(r)}
                   >
                     {v.status === "running"
-                      ? "verifying…"
+                      ? "checking…"
                       : account
-                        ? "verify privately"
-                        : "connect to verify"}
+                        ? "Verify it yourself"
+                        : "Connect a wallet to verify"}
                   </button>
                 </div>
 
                 {v.status === "ok" && (
                   <div className="verify-result ok">
-                    <strong>Hash matches the anchor.</strong> The agent's reasoning was: “
-                    {v.rationale}”
+                    <strong>Verified.</strong> The evidence is unaltered and the move stayed
+                    within the rules. The agent's own reasoning: “{v.rationale}”
                   </div>
                 )}
                 {v.status === "fail" && (
-                  <div className="verify-result fail">{v.error ?? "Verification failed."}</div>
+                  <div className="verify-result fail">
+                    {v.error ?? "This record did not check out."}
+                  </div>
                 )}
               </div>
             </li>

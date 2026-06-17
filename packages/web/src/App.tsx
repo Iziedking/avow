@@ -461,10 +461,32 @@ export function App() {
         })}
       </ul>
 
-      <footer className="foot">
+      <p className="foot-note">
         Each record points at evidence sealed on Walrus. Only a reader the owner authorized can
         decrypt it. The hash recomputed from that evidence has to match what was anchored on
         chain, or the record does not verify.
+      </p>
+
+      <footer className="site-foot">
+        <div className="foot-main">
+          <div className="foot-brand">
+            <span className="neon-wordmark">avow</span>
+            <span className="foot-tag">proof, not trust</span>
+          </div>
+          <nav className="foot-links">
+            <a href="https://github.com/Iziedking/avow" target="_blank" rel="noreferrer">
+              GitHub
+            </a>
+            <span className="foot-dot" />
+            <span>Sui · Walrus · Seal</span>
+            <span className="foot-dot" />
+            <span>Sui Overflow 2026 · Walrus track</span>
+          </nav>
+        </div>
+        <div className="foot-base">
+          <span>Apache-2.0</span>
+          <span className="foot-meta">testnet · {short(PACKAGE_ID)}</span>
+        </div>
       </footer>
       </div>
     </>

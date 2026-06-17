@@ -582,7 +582,7 @@ input:focus {
 }
 
 /* Foot */
-.foot {
+.foot-note {
   margin-top: 48px;
   padding-top: 22px;
   border-top: 1px solid var(--line);
@@ -590,6 +590,102 @@ input:focus {
   font-size: 12px;
   line-height: 1.7;
   max-width: 64ch;
+}
+
+/* Footer, with a neon Avow as the one flourish. Placed here so the glow has room to bleed. */
+.site-foot {
+  margin-top: 56px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
+}
+
+.foot-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 28px;
+  padding: 16px 0 36px;
+}
+
+.foot-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.neon-wordmark {
+  font-family: var(--serif);
+  font-size: 46px;
+  line-height: 0.9;
+  letter-spacing: -0.01em;
+  color: #eafff2;
+  text-shadow:
+    0 0 4px rgba(95, 208, 138, 0.9),
+    0 0 12px rgba(95, 208, 138, 0.7),
+    0 0 26px rgba(43, 255, 136, 0.55),
+    0 0 46px rgba(43, 255, 136, 0.35);
+  animation: neonFlicker 6s infinite steps(1);
+}
+
+@keyframes neonFlicker {
+  0%, 46%, 100% { opacity: 1; }
+  47% { opacity: 0.82; }
+  47.5% { opacity: 1; }
+  72% { opacity: 0.9; }
+  72.4% { opacity: 1; }
+}
+
+.foot-tag {
+  font-size: 11px;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.foot-links {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.foot-links a {
+  color: var(--text-dim);
+}
+
+.foot-links a:hover {
+  color: var(--green);
+}
+
+.foot-dot {
+  width: 3px;
+  height: 3px;
+  background: var(--line-2);
+}
+
+.foot-base {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.foot-meta {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 560px) {
+  .neon-wordmark {
+    font-size: 38px;
+  }
 }
 
 /* dapp-kit connect button, nudged toward the house style */

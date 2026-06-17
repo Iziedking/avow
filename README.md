@@ -147,6 +147,67 @@ const proof = await anchor({
 The [`examples/quickstart`](examples/quickstart) folder has a `create-mandate` script that
 mints the mandate and access for you, plus a runnable agent showing the call in context.
 
+## Command line
+
+Everything the SDK does is also a terminal command, through `avow-cli`. Use it to set a
+mandate, anchor an action, and verify a record without writing any code.
+
+```bash
+npm i -g avow-cli      # or run ad hoc with: npx avow-cli <command>
+```
+
+Two things it needs to know. Your key, and which network. The key signs your transactions and
+decrypts evidence you are allowed to read, so keep it to a throwaway testnet key:
+
+```bash
+export AVOW_KEY=suiprivkey1...    # your Sui private key, or pass --key on any command
+export AVOW_NETWORK=testnet       # the default, set mainnet to switch
+```
+
+**Set what an agent may do.** This mints the mandate (the rules) and the access object (the
+evidence vault), and prints their ids. You become the owner; the agent address you name is the
+only one that can anchor against it. Leave `--agent` off to name your own address.
+
+```bash
+avow create-mandate --agent 0xAGENT --per-move 1000000 --daily 10000000
+```
+
+It prints `AVOW_MANDATE_ID`, `AVOW_ACCESS_ID`, and an admin cap. Keep the cap safe; it is what
+lets you grant auditors later. Export the first two for the commands below:
+
+```bash
+export AVOW_MANDATE_ID=0x...   AVOW_ACCESS_ID=0x...
+```
+
+**Anchor an action.** Run this as the agent (its key in `AVOW_KEY`). It seals the evidence on
+Walrus and stamps the proof on chain. An amount or target that breaks the mandate will not
+anchor at all.
+
+```bash
+avow anchor --mandate $AVOW_MANDATE_ID --access $AVOW_ACCESS_ID \
+  --action payment --target stripe --amount 1500 --rationale "paid the approved invoice"
+```
+
+For richer evidence (observed data, before and after state, transfer digests), pass a JSON
+bundle instead: `avow anchor --mandate ... --access ... --bundle ./action.json`.
+
+**List the track record.** Read-only, no key required. Anyone can see what was anchored.
+
+```bash
+avow records --mandate $AVOW_MANDATE_ID
+```
+
+**Verify privately.** This is the point of Avow. It reads each blob back from Walrus, decrypts
+it with Seal (only if your key is an authorized reader), recomputes the hash, and confirms each
+action sat inside the mandate. It prints `ok` or `FAIL` per record and a final tally.
+
+```bash
+avow verify --mandate $AVOW_MANDATE_ID
+```
+
+Run `avow help` for the full list. The CLI is the same `anchor()` and `verify()` the SDK and
+the dashboard use, so a record anchored from the terminal verifies in the browser, and back.
+
 ## What it proves, and what it does not
 
 Avow proves two things about every anchored action: the evidence has not been altered since it

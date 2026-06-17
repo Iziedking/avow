@@ -38,6 +38,8 @@ function Mark() {
   return (
     <svg viewBox="0 0 512 512" fill="none" aria-hidden="true">
       <path
+        className="s1"
+        pathLength={1}
         d="M150 392 L256 120 L362 392"
         stroke="#5fd08a"
         strokeWidth="30"
@@ -45,6 +47,8 @@ function Mark() {
         strokeLinejoin="round"
       />
       <path
+        className="s2"
+        pathLength={1}
         d="M196 300 L238 342 L322 236"
         stroke="#74e09c"
         strokeWidth="26"
@@ -110,6 +114,35 @@ export function App() {
   useEffect(() => {
     load(mandateId);
   }, [mandateId, load]);
+
+  // Reveal sections as they scroll into view, the page assembling itself.
+  useEffect(() => {
+    const els = Array.from(document.querySelectorAll<HTMLElement>(".reveal"));
+    if (!("IntersectionObserver" in window)) {
+      els.forEach((el) => el.classList.add("is-in"));
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) {
+            e.target.classList.add("is-in");
+            io.unobserve(e.target);
+          }
+        }
+      },
+      { rootMargin: "0px 0px -8% 0px", threshold: 0.12 },
+    );
+    els.forEach((el) => io.observe(el));
+    // Safety net: never leave a section hidden if the observer is starved.
+    const fallback = window.setTimeout(() => {
+      els.forEach((el) => el.classList.add("is-in"));
+    }, 1500);
+    return () => {
+      io.disconnect();
+      window.clearTimeout(fallback);
+    };
+  }, [records.length, status, capId, setupOpen]);
 
   useEffect(() => {
     let cancelled = false;
@@ -208,6 +241,8 @@ export function App() {
           }}
         />
       )}
+      <div className="bg-grid" aria-hidden="true" />
+      <div className="watermark" aria-hidden="true" />
       <div className="page">
       <header className="masthead">
         <div className="masthead-top">
@@ -376,7 +411,7 @@ export function App() {
         </div>
       </section>
 
-      <div className="records-head">
+      <div className="records-head reveal">
         <span className="records-title">Track record</span>
         <span className="note">{short(mandateId, 8, 6)}</span>
       </div>
@@ -467,13 +502,13 @@ export function App() {
         })}
       </ul>
 
-      <p className="foot-note">
+      <p className="foot-note reveal">
         Each record points at evidence sealed on Walrus. Only a reader the owner authorized can
         decrypt it. The hash recomputed from that evidence has to match what was anchored on
         chain, or the record does not verify.
       </p>
 
-      <footer className="site-foot">
+      <footer className="site-foot reveal">
         <div className="foot-main">
           <div className="foot-brand">
             <span className="neon-wordmark">avow</span>

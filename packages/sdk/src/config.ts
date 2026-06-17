@@ -6,13 +6,18 @@
 
 export type AvowNetwork = "testnet" | "mainnet";
 
-export const NETWORK: AvowNetwork =
-  (process.env.AVOW_NETWORK as AvowNetwork | undefined) ?? "testnet";
+// Read an env override if we are in a Node-like runtime. Guarded so the SDK also runs in a
+// browser (the verification dashboard), where `process` does not exist.
+function env(key: string): string | undefined {
+  return typeof process !== "undefined" && process.env ? process.env[key] : undefined;
+}
+
+export const NETWORK: AvowNetwork = (env("AVOW_NETWORK") as AvowNetwork | undefined) ?? "testnet";
 
 // The published avow package. Source of truth is deployments/testnet.json; override with the
 // AVOW_PACKAGE_ID env var when pointing at a different deployment.
 export const PACKAGE_ID =
-  process.env.AVOW_PACKAGE_ID ??
+  env("AVOW_PACKAGE_ID") ??
   "0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e";
 
 // Seal open-mode key servers run by Mysten on testnet. Open mode lets any package request

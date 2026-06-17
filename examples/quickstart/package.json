@@ -1,0 +1,21 @@
+{
+  "name": "avow-quickstart",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Copy-paste example: give an agent a mandate, then prove its actions through Avow.",
+  "type": "module",
+  "scripts": {
+    "create-mandate": "tsx create-mandate.ts",
+    "agent": "tsx agent.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@avow/sdk": "^0.1.0",
+    "@mysten/sui": "2.17.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.21",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  }
+}

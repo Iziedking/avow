@@ -23,8 +23,16 @@ import { PACKAGE_ID, NETWORK } from "../src/config";
 import { EVIDENCE_VERSION, type EvidenceBundle, type AnchoredRecord } from "../src/types";
 
 function loadDevKeypair(): Ed25519Keypair {
-  const file = JSON.parse(readFileSync(".firecrawl/devkey.json", "utf8"));
-  return Ed25519Keypair.fromSecretKey(file.exportedPrivateKey as string);
+  // A fresh user sets AVOW_KEY to their own Sui private key. The .firecrawl fallback is only
+  // for this repo's local development.
+  const key = process.env.AVOW_KEY;
+  if (key) return Ed25519Keypair.fromSecretKey(key);
+  try {
+    const file = JSON.parse(readFileSync(".firecrawl/devkey.json", "utf8"));
+    return Ed25519Keypair.fromSecretKey(file.exportedPrivateKey as string);
+  } catch {
+    throw new Error("Set AVOW_KEY to your Sui private key (suiprivkey1...).");
+  }
 }
 
 function createdId(changes: unknown[], suffix: string): string {

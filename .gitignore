@@ -1,5 +1,6 @@
 # Internal planning and tooling, not for the public repo
 PLAN.md
+TESTING.md
 .claude/
 .firecrawl/
 memory/

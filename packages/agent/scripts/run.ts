@@ -17,8 +17,16 @@ const ACCESS_ID =
   "0x8f11810dabe1717db797bbb15afbcb21072fe56d3b8198213e4608a67d719ec1";
 
 function loadDevKeypair(): Ed25519Keypair {
-  const file = JSON.parse(readFileSync(".firecrawl/devkey.json", "utf8"));
-  return Ed25519Keypair.fromSecretKey(file.exportedPrivateKey as string);
+  // A fresh user sets AVOW_KEY to their own Sui private key. The .firecrawl fallback is only
+  // for this repo's local development.
+  const key = process.env.AVOW_KEY;
+  if (key) return Ed25519Keypair.fromSecretKey(key);
+  try {
+    const file = JSON.parse(readFileSync(".firecrawl/devkey.json", "utf8"));
+    return Ed25519Keypair.fromSecretKey(file.exportedPrivateKey as string);
+  } catch {
+    throw new Error("Set AVOW_KEY to your Sui private key (suiprivkey1...).");
+  }
 }
 
 async function main() {

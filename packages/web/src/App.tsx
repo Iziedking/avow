@@ -76,6 +76,8 @@ export function App() {
 
   const [showIntro, setShowIntro] = useState(() => {
     try {
+      // A ?app link skips straight to the dashboard.
+      if (new URLSearchParams(window.location.search).has("app")) return false;
       return sessionStorage.getItem("avow-intro") !== "done";
     } catch {
       return true;
@@ -220,7 +222,7 @@ export function App() {
         </p>
       </header>
 
-      <section className="how">
+      <section className="how hud">
         <div className="how-step">
           <span className="how-n">1</span>
           <div>
@@ -276,7 +278,7 @@ export function App() {
             {setupOpen ? "Hide setup" : "Set up an agent"}
           </button>
           {setupOpen && (
-            <div className="setup-body">
+            <div className="setup-body hud">
               <p className="setup-hint">
                 Create a mandate for your agent. You become the owner. The agent address you
                 name is the only one that can anchor against it.
@@ -332,7 +334,7 @@ export function App() {
       )}
 
       {capId && (
-        <section className="owner-panel">
+        <section className="owner-panel hud">
           <label className="label" htmlFor="auditor">
             You own this mandate · grant an auditor read access
           </label>
@@ -357,7 +359,7 @@ export function App() {
         </section>
       )}
 
-      <section className="summary">
+      <section className="summary hud">
         <div className="stat">
           <span className="stat-num">{moves}</span>
           <span className="stat-label">moves anchored</span>
@@ -373,7 +375,12 @@ export function App() {
         <span className="note">{short(mandateId, 8, 6)}</span>
       </div>
 
-      {status === "loading" && <p className="note">Reading the chain…</p>}
+      {status === "loading" && (
+        <div className="loading">
+          <span className="loading-label">retrieving record</span>
+          <span className="loading-bar" />
+        </div>
+      )}
       {status === "error" && <p className="note error">Could not load: {error}</p>}
       {status === "idle" && moves === 0 && (
         <p className="note">No anchored moves for this mandate yet.</p>

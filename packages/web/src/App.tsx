@@ -541,29 +541,6 @@ export function App() {
             <span>Sui Overflow 2026 · Walrus track</span>
           </nav>
         </div>
-        <div className="foot-dev">
-          <button className="foot-dev-label" onClick={() => setDocsOpen(true)}>
-            Build on it →
-          </button>
-          <div className="foot-cmds">
-            <a
-              className="foot-cmd"
-              href="https://www.npmjs.com/package/avow-cli"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span className="foot-cmd-prompt">$</span> npm i -g avow-cli
-            </a>
-            <a
-              className="foot-cmd"
-              href="https://www.npmjs.com/package/avow-sdk"
-              target="_blank"
-              rel="noreferrer"
-            >
-              <span className="foot-cmd-prompt">$</span> npm i avow-sdk
-            </a>
-          </div>
-        </div>
         <div className="foot-base">
           <span>Apache-2.0</span>
           <span className="foot-meta">testnet · {short(PACKAGE_ID)}</span>

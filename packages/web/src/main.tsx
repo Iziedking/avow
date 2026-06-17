@@ -5,10 +5,12 @@ import { SuiClientProvider, WalletProvider } from "@mysten/dapp-kit";
 import { getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { App } from "./App";
 import { avowDark } from "./theme";
-import "@fontsource-variable/fraunces";
-import "@fontsource/ibm-plex-mono/400.css";
-import "@fontsource/ibm-plex-mono/500.css";
-import "@fontsource/ibm-plex-mono/600.css";
+// Latin only, to keep the Walrus Site lean. Fraunces uses the weight-axis file; Plex Mono the
+// latin subset of the three weights we use.
+import "@fontsource-variable/fraunces/wght.css";
+import "@fontsource/ibm-plex-mono/latin-400.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
+import "@fontsource/ibm-plex-mono/latin-600.css";
 import "@mysten/dapp-kit/dist/index.css";
 import "./styles.css";
 

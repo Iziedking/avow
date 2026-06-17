@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/avow-mark-512.png" width="92" height="92" alt="Avow" />
+  <img src="assets/avow-wordmark.png" width="460" alt="Avow — proof, not trust" />
 </p>
 
 # Avow
@@ -176,8 +176,6 @@ Testnet, recorded in [`deployments/testnet.json`](deployments/testnet.json):
 - Package: `0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e`
 - Reference mandate: `0x0f893eb746e08ae348d1389f3c633b282966218e784e8f142bf0acaa60184c11`
 
-A mainnet deployment, with the dashboard as a public Walrus Site under a SuiNS name, is the
-final step before submission.
 
 ## License
 

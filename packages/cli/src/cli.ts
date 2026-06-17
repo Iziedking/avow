@@ -50,26 +50,38 @@ Examples:
   avow records --mandate 0xM
 `;
 
-const { values, positionals } = parseArgs({
-  allowPositionals: true,
-  options: {
-    key: { type: "string" },
-    agent: { type: "string" },
-    "per-move": { type: "string" },
-    daily: { type: "string" },
-    expiry: { type: "string" },
-    restrict: { type: "boolean" },
-    mandate: { type: "string" },
-    access: { type: "string" },
-    action: { type: "string" },
-    target: { type: "string" },
-    amount: { type: "string" },
-    rationale: { type: "string" },
-    digest: { type: "string", multiple: true },
-    bundle: { type: "string" },
-    limit: { type: "string" },
-  },
-});
+function parseCliArgs() {
+  try {
+    return parseArgs({
+      allowPositionals: true,
+      options: {
+        key: { type: "string" },
+        agent: { type: "string" },
+        "per-move": { type: "string" },
+        daily: { type: "string" },
+        expiry: { type: "string" },
+        restrict: { type: "boolean" },
+        mandate: { type: "string" },
+        access: { type: "string" },
+        action: { type: "string" },
+        target: { type: "string" },
+        amount: { type: "string" },
+        rationale: { type: "string" },
+        digest: { type: "string", multiple: true },
+        bundle: { type: "string" },
+        limit: { type: "string" },
+      },
+    });
+  } catch (e) {
+    // The most common cause is an empty value, for example --mandate with an unset shell
+    // variable. Say so instead of dumping a parser stack trace.
+    console.error(`error: ${e instanceof Error ? e.message : e}`);
+    console.error('A flag is probably missing its value (an unset variable?). Run "avow help".');
+    process.exit(1);
+  }
+}
+
+const { values, positionals } = parseCliArgs();
 
 function fail(message: string): never {
   console.error(`error: ${message}`);

@@ -152,8 +152,20 @@ mints the mandate and access for you, plus a runnable agent showing the call in 
 Everything the SDK does is also a terminal command, through `avow-cli`. Use it to set a
 mandate, anchor an action, and verify a record without writing any code.
 
+From a clone of this repo it runs today. Install the workspace once, then alias `avow` to the
+package script so the examples below read as written:
+
 ```bash
-npm i -g avow-cli      # or run ad hoc with: npx avow-cli <command>
+npm install
+alias avow='npm -w avow-cli run --silent avow --'
+avow help
+```
+
+Once the package is published to npm, the same commands work from a global install instead:
+
+```bash
+npm i -g avow-cli
+avow help
 ```
 
 Two things it needs to know. Your key, and which network. The key signs your transactions and

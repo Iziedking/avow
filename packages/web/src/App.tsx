@@ -24,9 +24,28 @@ function short(value: string, head = 6, tail = 4): string {
   return `${value.slice(0, head)}…${value.slice(-tail)}`;
 }
 
+function group(n: string): string {
+  return /^\d+$/.test(n) ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : n;
+}
+
 function formatTime(ms: number): string {
   if (!ms) return "";
   return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+}
+
+function Mark() {
+  return (
+    <svg viewBox="0 0 512 512" fill="none" aria-hidden="true">
+      <circle cx="256" cy="256" r="150" stroke="#5fd08a" strokeOpacity="0.28" strokeWidth="14" />
+      <path
+        d="M182 262 L236 316 L334 196"
+        stroke="#5fd08a"
+        strokeWidth="34"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
 }
 
 export function App() {
@@ -58,41 +77,6 @@ export function App() {
   const { mutateAsync: signPersonalMessage } = useSignPersonalMessage();
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
-  // Find the mandate's access, and whether the connected wallet owns its admin cap.
-  useEffect(() => {
-    let cancelled = false;
-    setCapId(null);
-    setGrant({ status: "idle" });
-    (async () => {
-      const acc = await fetchAccessId(mandateId).catch(() => null);
-      if (!cancelled) setAccessId(acc);
-      if (account) {
-        const cap = await findCapForMandate(account.address, mandateId).catch(() => null);
-        if (!cancelled) setCapId(cap);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [account, mandateId]);
-
-  const onGrant = useCallback(async () => {
-    if (!capId || !accessId || !auditor.trim()) return;
-    setGrant({ status: "running" });
-    try {
-      const tx = new Transaction();
-      tx.moveCall({
-        target: `${PACKAGE_ID}::record::add_auditor`,
-        arguments: [tx.object(accessId), tx.object(capId), tx.pure.address(auditor.trim())],
-      });
-      const res = await signAndExecute({ transaction: tx });
-      setGrant({ status: "ok", msg: `Granted. They can verify now. tx ${res.digest.slice(0, 10)}…` });
-      setAuditor("");
-    } catch (e) {
-      setGrant({ status: "fail", msg: e instanceof Error ? e.message : String(e) });
-    }
-  }, [capId, accessId, auditor, signAndExecute]);
-
   const load = useCallback(async (id: string) => {
     setStatus("loading");
     setError("");
@@ -110,10 +94,27 @@ export function App() {
     load(mandateId);
   }, [mandateId, load]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setCapId(null);
+    setGrant({ status: "idle" });
+    (async () => {
+      const acc = await fetchAccessId(mandateId).catch(() => null);
+      if (!cancelled) setAccessId(acc);
+      if (account) {
+        const cap = await findCapForMandate(account.address, mandateId).catch(() => null);
+        if (!cancelled) setCapId(cap);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [account, mandateId]);
+
   const onVerify = useCallback(
     async (r: AnchoredRecord) => {
       if (!account) return;
-      const key = r.txDigest;
+      const key = r.txDigest ?? r.blobId;
       setVerify((s) => ({ ...s, [key]: { status: "running" } }));
       try {
         const out = await verifyRecord(r, account.address, async ({ message }) => {
@@ -138,11 +139,28 @@ export function App() {
     [account, signPersonalMessage],
   );
 
+  const onGrant = useCallback(async () => {
+    if (!capId || !accessId || !auditor.trim()) return;
+    setGrant({ status: "running" });
+    try {
+      const tx = new Transaction();
+      tx.moveCall({
+        target: `${PACKAGE_ID}::record::add_auditor`,
+        arguments: [tx.object(accessId), tx.object(capId), tx.pure.address(auditor.trim())],
+      });
+      const res = await signAndExecute({ transaction: tx });
+      setGrant({ status: "ok", msg: `Granted. They can verify now. tx ${res.digest.slice(0, 10)}…` });
+      setAuditor("");
+    } catch (e) {
+      setGrant({ status: "fail", msg: e instanceof Error ? e.message : String(e) });
+    }
+  }, [capId, accessId, auditor, signAndExecute]);
+
   const onSetup = useCallback(async () => {
     if (!account) return;
     setSetupState({ status: "running" });
     try {
-      const result = await setupMandate((input) => signAndExecute(input), {
+      const result = await setupMandate((i) => signAndExecute(i), {
         agent: setupAgent.trim() || account.address,
         perMoveCap: BigInt(setupPerMove || "0"),
         dailyCap: BigInt(setupDaily || "0"),
@@ -164,20 +182,25 @@ export function App() {
       <header className="masthead">
         <div className="masthead-top">
           <div className="brand">
-            <span className="brand-mark">avow</span>
-            <span className="brand-line">proof, not trust</span>
+            <Mark />
+            <div className="brand-text">
+              <span className="brand-mark">avow</span>
+              <span className="brand-line">proof, not trust</span>
+            </div>
           </div>
           <ConnectButton />
         </div>
         <p className="lede">
           The track record of an autonomous agent on Sui. Every move it made is anchored on
-          chain and provable. Connect a wallet you authorized to decrypt the evidence and watch
-          each move verify against its anchor.
+          chain and provable. <strong>Connect a wallet you authorized</strong> to decrypt the
+          evidence and watch each move verify against its anchor.
         </p>
       </header>
 
       <section className="finder">
-        <label htmlFor="mandate">Mandate</label>
+        <label className="label" htmlFor="mandate">
+          Mandate
+        </label>
         <div className="finder-row">
           <input
             id="mandate"
@@ -188,13 +211,15 @@ export function App() {
               if (e.key === "Enter") setMandateId(input);
             }}
           />
-          <button onClick={() => setMandateId(input)}>Load record</button>
+          <button className="btn" onClick={() => setMandateId(input)}>
+            Load
+          </button>
         </div>
       </section>
 
       {account && (
         <section className="setup">
-          <button className="setup-toggle" onClick={() => setSetupOpen((o) => !o)}>
+          <button className="btn-ghost" onClick={() => setSetupOpen((o) => !o)}>
             {setupOpen ? "Hide setup" : "Set up an agent"}
           </button>
           {setupOpen && (
@@ -231,16 +256,18 @@ export function App() {
                 </label>
               </div>
               <button
-                className="setup-create"
+                className="btn-green"
                 onClick={onSetup}
                 disabled={setupState.status === "running"}
+                style={{ padding: "10px 18px" }}
               >
-                {setupState.status === "running" ? "creating…" : "create mandate"}
+                {setupState.status === "running" ? "creating…" : "Create mandate"}
               </button>
               {setupState.status === "ok" && setupState.result && (
                 <div className="verify-result ok">
-                  Created and loaded above. mandate {setupState.result.mandateId.slice(0, 10)}…
-                  access {setupState.result.accessId.slice(0, 10)}…
+                  <strong>Created and loaded above.</strong> mandate{" "}
+                  {short(setupState.result.mandateId)} · access{" "}
+                  {short(setupState.result.accessId)}
                 </div>
               )}
               {setupState.status === "fail" && (
@@ -251,20 +278,11 @@ export function App() {
         </section>
       )}
 
-      <section className="summary">
-        <div className="stat">
-          <span className="stat-num">{moves}</span>
-          <span className="stat-label">moves anchored</span>
-        </div>
-        <div className="stat">
-          <span className="stat-num">{totalMoved.toString()}</span>
-          <span className="stat-label">total moved (smallest unit)</span>
-        </div>
-      </section>
-
       {capId && (
         <section className="owner-panel">
-          <label htmlFor="auditor">You own this mandate. Grant an auditor read access.</label>
+          <label className="label" htmlFor="auditor">
+            You own this mandate · grant an auditor read access
+          </label>
           <div className="finder-row">
             <input
               id="auditor"
@@ -273,14 +291,34 @@ export function App() {
               spellCheck={false}
               onChange={(e) => setAuditor(e.target.value)}
             />
-            <button onClick={onGrant} disabled={grant.status === "running" || !auditor.trim()}>
-              {grant.status === "running" ? "granting…" : "grant access"}
+            <button
+              className="btn-green"
+              onClick={onGrant}
+              disabled={grant.status === "running" || !auditor.trim()}
+            >
+              {grant.status === "running" ? "granting…" : "Grant"}
             </button>
           </div>
           {grant.status === "ok" && <p className="note ok-note">{grant.msg}</p>}
           {grant.status === "fail" && <p className="note error">{grant.msg}</p>}
         </section>
       )}
+
+      <section className="summary">
+        <div className="stat">
+          <span className="stat-num">{moves}</span>
+          <span className="stat-label">moves anchored</span>
+        </div>
+        <div className="stat">
+          <span className="stat-num tnum">{group(totalMoved.toString())}</span>
+          <span className="stat-label">total moved · smallest unit</span>
+        </div>
+      </section>
+
+      <div className="records-head">
+        <span className="records-title">Track record</span>
+        <span className="note">{short(mandateId, 8, 6)}</span>
+      </div>
 
       {status === "loading" && <p className="note">Reading the chain…</p>}
       {status === "error" && <p className="note error">Could not load: {error}</p>}
@@ -289,83 +327,84 @@ export function App() {
       )}
 
       <ul className="records">
-        {records.map((r) => {
-          const v = verify[r.txDigest] ?? { status: "idle" as VerifyStatus };
+        {records.map((r, i) => {
+          const key = r.txDigest ?? r.blobId;
+          const v = verify[key] ?? { status: "idle" as VerifyStatus };
           return (
-            <li className="record" key={r.txDigest}>
-              <div className="record-top">
-                <span className="badge">{r.actionType || "action"}</span>
-                <span className="target">→ {r.target || "—"}</span>
-                <span className="amount">{r.amount}</span>
-                {v.status === "ok" ? (
-                  <span className="verified" title="Decrypted, hash matches the on-chain anchor">
-                    verified
+            <li className="record" key={key} style={{ animationDelay: `${i * 40}ms` }}>
+              <div className="record-index tnum">{String(i + 1).padStart(2, "0")}</div>
+              <div className="record-main">
+                <div className="record-top">
+                  <span className="badge">{r.actionType || "action"}</span>
+                  <span className="target">{r.target || "—"}</span>
+                  <span className="amount tnum">{group(r.amount)}</span>
+                  <span className={`status${v.status === "ok" ? " is-verified" : ""}`}>
+                    {v.status === "ok" ? "verified" : "anchored"}
                   </span>
-                ) : (
-                  <span className="anchored" title="Anchored on chain, the move passed its mandate">
-                    anchored
-                  </span>
-                )}
-              </div>
-
-              <div className="record-meta">
-                <span className="meta-item">
-                  <span className="k">epoch</span> {r.epoch}
-                </span>
-                {r.timestampMs > 0 && (
-                  <span className="meta-item">
-                    <span className="k">when</span> {formatTime(r.timestampMs)}
-                  </span>
-                )}
-                <span className="meta-item mono">
-                  <span className="k">hash</span> {short(r.evidenceHashHex, 10, 8)}
-                </span>
-              </div>
-
-              <div className="record-links">
-                <a href={`${SUISCAN}/tx/${r.txDigest}`} target="_blank" rel="noreferrer">
-                  anchor tx
-                </a>
-                <a
-                  href={`${WALRUS_AGGREGATOR}/v1/blobs/${r.blobId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  sealed evidence
-                </a>
-                <button
-                  className="verify-btn"
-                  disabled={!account || v.status === "running"}
-                  onClick={() => onVerify(r)}
-                >
-                  {v.status === "running"
-                    ? "verifying…"
-                    : account
-                      ? "verify privately"
-                      : "connect to verify"}
-                </button>
-              </div>
-
-              {v.status === "ok" && (
-                <div className="verify-result ok">
-                  <strong>Hash matches the anchor.</strong> The agent's reasoning was: “
-                  {v.rationale}”
                 </div>
-              )}
-              {v.status === "fail" && (
-                <div className="verify-result fail">{v.error ?? "Verification failed."}</div>
-              )}
+
+                <div className="record-meta">
+                  <span>
+                    <span className="k">epoch</span>
+                    {r.epoch}
+                  </span>
+                  {r.timestampMs ? (
+                    <span>
+                      <span className="k">when</span>
+                      {formatTime(r.timestampMs)}
+                    </span>
+                  ) : null}
+                  <span>
+                    <span className="k">hash</span>
+                    {short(r.evidenceHashHex, 10, 8)}
+                  </span>
+                </div>
+
+                <div className="record-links">
+                  {r.txDigest && (
+                    <a href={`${SUISCAN}/tx/${r.txDigest}`} target="_blank" rel="noreferrer">
+                      anchor tx
+                    </a>
+                  )}
+                  <a
+                    href={`${WALRUS_AGGREGATOR}/v1/blobs/${r.blobId}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    sealed evidence
+                  </a>
+                  <button
+                    className="verify-btn"
+                    disabled={!account || v.status === "running"}
+                    onClick={() => onVerify(r)}
+                  >
+                    {v.status === "running"
+                      ? "verifying…"
+                      : account
+                        ? "verify privately"
+                        : "connect to verify"}
+                  </button>
+                </div>
+
+                {v.status === "ok" && (
+                  <div className="verify-result ok">
+                    <strong>Hash matches the anchor.</strong> The agent's reasoning was: “
+                    {v.rationale}”
+                  </div>
+                )}
+                {v.status === "fail" && (
+                  <div className="verify-result fail">{v.error ?? "Verification failed."}</div>
+                )}
+              </div>
             </li>
           );
         })}
       </ul>
 
       <footer className="foot">
-        <p>
-          Each record points at evidence sealed on Walrus. Only a reader the owner authorized
-          can decrypt it. The hash recomputed from that evidence has to match what was anchored
-          on chain, or the record does not verify.
-        </p>
+        Each record points at evidence sealed on Walrus. Only a reader the owner authorized can
+        decrypt it. The hash recomputed from that evidence has to match what was anchored on
+        chain, or the record does not verify.
       </footer>
     </div>
   );

@@ -66,3 +66,17 @@ export async function fetchRecords(mandateId: string): Promise<AnchoredRecord[]>
 
   return records.filter((r) => r.mandateId === mandateId);
 }
+
+// The single evidence access registered for a mandate, found from its AccessCreated event.
+export async function fetchAccessId(mandateId: string): Promise<string | null> {
+  const client = suiClient();
+  const res = await client.queryEvents({
+    query: { MoveEventType: `${PACKAGE_ID}::record::AccessCreated` },
+    order: "descending",
+    limit: 50,
+  });
+  const ev = res.data.find(
+    (e) => String((e.parsedJson as Record<string, unknown>).mandate_id) === mandateId,
+  );
+  return ev ? String((ev.parsedJson as Record<string, unknown>).access_id) : null;
+}

@@ -10,7 +10,7 @@
 
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
-import { getSuiClient, PACKAGE_ID, NETWORK } from "@avow/sdk";
+import { getSuiClient, PACKAGE_ID, NETWORK } from "avow-sdk";
 
 loadEnv();
 

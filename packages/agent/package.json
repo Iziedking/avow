@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@avow/sdk": "*",
+    "avow-sdk": "*",
     "@mysten/sui": "2.17.0"
   },
   "devDependencies": {

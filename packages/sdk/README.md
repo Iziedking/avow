@@ -1,4 +1,4 @@
-# @avow/sdk
+# avow-sdk
 
 Avow is a trust layer for AI agents that move money on Sui. Your agent does whatever it
 does. After each action, it calls `anchor()`, and Avow turns that action into a private,
@@ -13,7 +13,7 @@ This SDK is two calls.
 ## Install
 
 ```bash
-npm install @avow/sdk
+npm install avow-sdk
 ```
 
 You also need a Sui wallet for your agent and, for storing evidence, a little SUI and WAL on
@@ -28,7 +28,7 @@ import {
   getWalrusClient,
   anchor,
   EVIDENCE_VERSION,
-} from "@avow/sdk";
+} from "avow-sdk";
 
 const sui = getSuiClient();
 const seal = getSealClient(sui);
@@ -66,7 +66,7 @@ and the target land on chain. Your strategy stays yours.
 ## Verify a record
 
 ```ts
-import { getSuiClient, getSealClient, getWalrusClient, verify } from "@avow/sdk";
+import { getSuiClient, getSealClient, getWalrusClient, verify } from "avow-sdk";
 import { SessionKey } from "@mysten/seal";
 
 const sessionKey = await SessionKey.create({

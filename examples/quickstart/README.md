@@ -61,4 +61,4 @@ Avow-specific part is the single `anchor()` call. That is the whole integration.
 marker transaction for your real move, fill the bundle with what your agent actually did, and
 your agent's track record becomes provable without changing anything else.
 
-See the [`@avow/sdk` README](../../packages/sdk/README.md) for the `anchor` and `verify` API.
+See the [`avow-sdk` README](../../packages/sdk/README.md) for the `anchor` and `verify` API.

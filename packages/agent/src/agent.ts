@@ -4,9 +4,9 @@
 // the Avow SDK, is what makes the move provable. Nothing here knows how the money moves; it
 // only knows the money layer and the proof layer.
 
-import { anchor, EVIDENCE_VERSION } from "@avow/sdk";
-import type { AnchorResult, EvidenceBundle } from "@avow/sdk";
-import type { getSuiClient, getSealClient, getWalrusClient } from "@avow/sdk";
+import { anchor, EVIDENCE_VERSION } from "avow-sdk";
+import type { AnchorResult, EvidenceBundle } from "avow-sdk";
+import type { getSuiClient, getSealClient, getWalrusClient } from "avow-sdk";
 import type { Signer } from "@mysten/sui/cryptography";
 import { decide } from "./policy";
 import type { Decision, MoneyLayer } from "./money";

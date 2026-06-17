@@ -1,5 +1,5 @@
 {
-  "name": "@avow/sdk",
+  "name": "avow-sdk",
   "version": "0.1.0",
   "description": "Anchor an AI agent's actions as private, verifiable evidence on Walrus and Seal, and verify any anchored record. The trust layer any money-moving agent on Sui can plug into.",
   "license": "Apache-2.0",

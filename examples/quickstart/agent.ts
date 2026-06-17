@@ -17,7 +17,7 @@ import {
   anchor,
   EVIDENCE_VERSION,
   NETWORK,
-} from "@avow/sdk";
+} from "avow-sdk";
 
 loadEnv();
 

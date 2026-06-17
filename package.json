@@ -9,5 +9,8 @@
   ],
   "engines": {
     "node": ">=20"
+  },
+  "overrides": {
+    "@mysten/sui": "2.17.0"
   }
 }

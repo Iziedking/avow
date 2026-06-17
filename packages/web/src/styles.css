@@ -43,6 +43,13 @@ a:hover {
   margin-bottom: 40px;
 }
 
+.masthead-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
 .brand {
   display: flex;
   align-items: baseline;
@@ -122,6 +129,57 @@ a:hover {
   display: flex;
   gap: 14px;
   margin-bottom: 28px;
+}
+
+.owner-panel {
+  margin-bottom: 28px;
+  padding: 16px 18px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.owner-panel label {
+  display: block;
+  font-size: 13px;
+  color: #c2c9ce;
+  margin-bottom: 10px;
+}
+
+.owner-panel input {
+  flex: 1;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.owner-panel input:focus {
+  outline: none;
+  border-color: #3a464d;
+}
+
+.owner-panel button {
+  background: var(--accent);
+  color: #06120b;
+  border: 0;
+  border-radius: 8px;
+  padding: 0 16px;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.owner-panel button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ok-note {
+  color: var(--accent);
 }
 
 .stat {
@@ -235,13 +293,70 @@ a:hover {
   font-family: var(--mono);
 }
 
+.verified {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+}
+
+.verified::before {
+  content: "✓";
+  font-weight: 700;
+}
+
 .record-links {
   display: flex;
+  align-items: center;
   gap: 18px;
   margin-top: 12px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
   font-size: 13px;
+}
+
+.verify-btn {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--ink);
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.verify-btn:hover:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.verify-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.verify-result {
+  margin-top: 12px;
+  padding: 11px 13px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.verify-result.ok {
+  background: rgba(95, 208, 138, 0.08);
+  border: 1px solid rgba(95, 208, 138, 0.35);
+  color: #d5f2e1;
+}
+
+.verify-result.fail {
+  background: rgba(224, 160, 74, 0.08);
+  border: 1px solid rgba(224, 160, 74, 0.35);
+  color: #f0dcc2;
 }
 
 .foot {

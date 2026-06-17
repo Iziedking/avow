@@ -5,7 +5,7 @@
 
 import { readFileSync } from "node:fs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
-import { getSuiClient, getSealClient, getWalrusClient, NETWORK } from "@avow/sdk";
+import { getSuiClient, getSealClient, getWalrusClient, NETWORK } from "avow-sdk";
 import { LocalMoneyLayer } from "../src/local-money";
 import { runCycle } from "../src/agent";
 

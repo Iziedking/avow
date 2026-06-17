@@ -858,9 +858,10 @@ input:focus {
 
 .wc-modal {
   position: relative;
-  width: min(720px, 95vw);
+  width: min(840px, 96vw);
   background: var(--ink-850);
   border: 1px solid var(--line);
+  border-radius: 18px;
   animation: rise 0.3s ease both;
   font-family: var(--mono);
   overflow: hidden;
@@ -889,7 +890,7 @@ input:focus {
 }
 
 .wc-pane {
-  padding: 26px 24px;
+  padding: 32px 30px;
 }
 
 .wc-pane-connect {
@@ -918,10 +919,11 @@ input:focus {
   gap: 12px;
   background: var(--ink-800);
   border: 1px solid var(--line);
+  border-radius: 12px;
   color: var(--text);
   font-family: var(--mono);
   font-size: 13px;
-  padding: 12px 14px;
+  padding: 14px 16px;
   cursor: pointer;
 }
 
@@ -959,7 +961,8 @@ input:focus {
 
 .wc-get {
   border: 1px solid var(--line);
-  padding: 7px 11px;
+  border-radius: 9px;
+  padding: 8px 12px;
   font-size: 12px;
   color: var(--text-dim);
 }
@@ -973,7 +976,7 @@ input:focus {
 .wc-pane-link {
   position: relative;
   display: flex;
-  min-height: 320px;
+  min-height: 380px;
   background: var(--ink-900);
   border-left: 1px solid var(--line);
   overflow: hidden;
@@ -1074,7 +1077,7 @@ input:focus {
 
 .wc-link-log li {
   opacity: 0;
-  animation: logIn 0.4s ease forwards;
+  animation: logLoop 4.4s ease infinite;
 }
 
 .wc-link-log li::before {
@@ -1083,29 +1086,31 @@ input:focus {
 }
 
 .wc-link-log li:nth-child(1) {
-  animation-delay: 0.25s;
+  animation-delay: 0s;
 }
 
 .wc-link-log li:nth-child(2) {
-  animation-delay: 0.65s;
+  animation-delay: 0.7s;
 }
 
-.wc-link-log li:nth-child(3) {
-  animation-delay: 1.05s;
-}
-
-.wc-link-log li:nth-child(4) {
-  animation-delay: 1.45s;
-}
-
-@keyframes logIn {
-  from {
+/* A continuous boot: the lines type in, hold, clear, and the console starts over. */
+@keyframes logLoop {
+  0% {
     opacity: 0;
-    transform: translateX(-4px);
+    transform: translateX(-5px);
   }
-  to {
+  8% {
     opacity: 1;
     transform: none;
+  }
+  84% {
+    opacity: 1;
+    transform: none;
+  }
+  96%,
+  100% {
+    opacity: 0;
+    transform: translateX(-5px);
   }
 }
 
@@ -1649,5 +1654,9 @@ body::before {
   }
   .brand svg path {
     stroke-dashoffset: 0;
+  }
+  .wc-link-log li {
+    opacity: 1;
+    transform: none;
   }
 }

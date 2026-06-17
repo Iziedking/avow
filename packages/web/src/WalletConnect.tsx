@@ -56,8 +56,6 @@ function SecureLink() {
 
       <ul className="wc-link-log">
         <li>establishing secure channel</li>
-        <li>no password, no account</li>
-        <li>your keys stay on this device</li>
         <li className="wc-link-cur">awaiting wallet handshake</li>
       </ul>
     </div>
@@ -114,7 +112,7 @@ export function WalletConnect() {
 
   const modal = (
     <div className="wc-overlay" onClick={() => setOpen(false)}>
-      <div className="wc-modal hud" onClick={(e) => e.stopPropagation()}>
+      <div className="wc-modal" onClick={(e) => e.stopPropagation()}>
         <button className="wc-x" onClick={() => setOpen(false)} aria-label="Close">
           ×
         </button>

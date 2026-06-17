@@ -1,8 +1,9 @@
-// A connect modal with Avow's own copy instead of dapp-kit's generic "what is a wallet" text,
-// and the common Sui wallets always offered. Rendered through a portal to document.body so the
-// overlay always covers the viewport and never gets trapped inside a transformed ancestor.
+// The wallet popup, in the shape of dapp-kit's default two-pane modal: the wallet list on the
+// left, and where the generic "what is a wallet" write-up sat, a sci-fi secure-link loader that
+// echoes the landing page boot. Rendered through a portal so the overlay always covers the
+// viewport and never gets trapped inside a transformed ancestor.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   useWallets,
@@ -22,6 +23,47 @@ function short(addr: string): string {
   return `${addr.slice(0, 6)}…${addr.slice(-4)}`;
 }
 
+// The sci-fi panel that stands in for the old write-up: a console establishing the link.
+function SecureLink() {
+  return (
+    <div className="wc-link">
+      <span className="wc-link-tag">
+        <span className="wc-link-dot" /> secure link
+      </span>
+
+      <div className="wc-link-core">
+        <svg viewBox="0 0 512 512" fill="none" aria-hidden="true" className="wc-link-mark">
+          <path
+            d="M150 392 L256 120 L362 392"
+            stroke="#5fd08a"
+            strokeWidth="30"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+          <path
+            d="M196 300 L238 342 L322 236"
+            stroke="#74e09c"
+            strokeWidth="26"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
+        </svg>
+      </div>
+
+      <div className="wc-link-bar">
+        <span />
+      </div>
+
+      <ul className="wc-link-log">
+        <li>establishing secure channel</li>
+        <li>no password, no account</li>
+        <li>your keys stay on this device</li>
+        <li className="wc-link-cur">awaiting wallet handshake</li>
+      </ul>
+    </div>
+  );
+}
+
 export function WalletConnect() {
   const wallets = useWallets();
   const account = useCurrentAccount();
@@ -35,6 +77,15 @@ export function WalletConnect() {
     }
   });
   const [menu, setMenu] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   if (account) {
     return (
@@ -64,53 +115,55 @@ export function WalletConnect() {
   const modal = (
     <div className="wc-overlay" onClick={() => setOpen(false)}>
       <div className="wc-modal hud" onClick={(e) => e.stopPropagation()}>
-        <div className="wc-head">
-          <span>Connect a wallet</span>
-          <button className="wc-x" onClick={() => setOpen(false)} aria-label="Close">
-            ×
-          </button>
-        </div>
+        <button className="wc-x" onClick={() => setOpen(false)} aria-label="Close">
+          ×
+        </button>
 
-        {wallets.length > 0 && (
-          <div className="wc-list">
-            {wallets.map((w) => (
-              <button
-                key={w.name}
-                className="wc-wallet"
-                onClick={() => connect({ wallet: w }, { onSuccess: () => setOpen(false) })}
-              >
-                {w.icon && <img src={w.icon} alt="" width={22} height={22} />}
-                <span>{w.name}</span>
-              </button>
-            ))}
+        <div className="wc-grid">
+          <div className="wc-pane wc-pane-connect">
+            <h3 className="wc-pane-title">Connect a Wallet</h3>
+
+            {wallets.length > 0 ? (
+              <div className="wc-list">
+                {wallets.map((w) => (
+                  <button
+                    key={w.name}
+                    className="wc-wallet"
+                    onClick={() => connect({ wallet: w }, { onSuccess: () => setOpen(false) })}
+                  >
+                    {w.icon && <img src={w.icon} alt="" width={22} height={22} />}
+                    <span>{w.name}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="wc-empty">No Sui wallet detected. Install one below to continue.</p>
+            )}
+
+            {toGet.length > 0 && (
+              <div className="wc-install">
+                <h4>Don't have one? Get a Sui wallet</h4>
+                <div className="wc-get-row">
+                  {toGet.map((r) => (
+                    <a
+                      key={r.name}
+                      href={r.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="wc-get"
+                    >
+                      {r.name} ↗
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-        )}
 
-        <div className="wc-about">
-          <h4>Sign in, no passwords</h4>
-          <p>
-            Connect a wallet instead of creating an account. It is how you identify yourself on
-            Avow and approve what your agent does.
-          </p>
-          <h4>You keep control</h4>
-          <p>
-            Avow never holds your funds. Your wallet only decrypts the evidence you are
-            authorized to read and signs the transactions you choose.
-          </p>
-        </div>
-
-        {toGet.length > 0 && (
-          <div className="wc-install">
-            <h4>Don't have one? Get a Sui wallet</h4>
-            <div className="wc-get-row">
-              {toGet.map((r) => (
-                <a key={r.name} href={r.url} target="_blank" rel="noreferrer" className="wc-get">
-                  {r.name} ↗
-                </a>
-              ))}
-            </div>
+          <div className="wc-pane wc-pane-link">
+            <SecureLink />
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

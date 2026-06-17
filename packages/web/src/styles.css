@@ -857,30 +857,20 @@ input:focus {
 }
 
 .wc-modal {
-  width: min(440px, 94vw);
+  position: relative;
+  width: min(720px, 95vw);
   background: var(--ink-850);
   border: 1px solid var(--line);
-  padding: 24px;
   animation: rise 0.3s ease both;
-  /* The wallet popup keeps its original mono voice, by request. */
   font-family: var(--mono);
-}
-
-.wc-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: #5a9e77;
-  text-shadow: 0 0 6px rgba(95, 208, 138, 0.2);
-  border-bottom: 1px solid var(--line);
-  padding-bottom: 14px;
-  margin-bottom: 18px;
+  overflow: hidden;
 }
 
 .wc-x {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 3;
   background: transparent;
   border: 0;
   color: var(--text-faint);
@@ -893,11 +883,33 @@ input:focus {
   color: var(--text);
 }
 
+.wc-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+
+.wc-pane {
+  padding: 26px 24px;
+}
+
+.wc-pane-connect {
+  display: flex;
+  flex-direction: column;
+}
+
+.wc-pane-title {
+  margin: 0 0 18px;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
 .wc-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 
 .wc-wallet {
@@ -917,34 +929,26 @@ input:focus {
   border-color: var(--green);
 }
 
-.wc-about h4,
-.wc-install h4 {
-  margin: 0 0 7px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.wc-about p {
-  margin: 0 0 16px;
-  font-size: 13px;
+.wc-empty {
+  margin: 0 0 18px;
+  font-size: 12.5px;
   line-height: 1.55;
   color: var(--text-dim);
 }
 
 .wc-install {
-  margin-top: 4px;
+  margin-top: auto;
   padding-top: 16px;
   border-top: 1px solid var(--line);
 }
 
 .wc-install h4 {
+  margin: 0 0 10px;
   font-size: 11px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-faint);
   font-weight: 500;
-  margin-bottom: 10px;
 }
 
 .wc-get-row {
@@ -963,6 +967,168 @@ input:focus {
 .wc-get:hover {
   border-color: var(--green);
   color: var(--green);
+}
+
+/* The secure-link pane, a boot console where the write-up used to be. */
+.wc-pane-link {
+  position: relative;
+  display: flex;
+  min-height: 320px;
+  background: var(--ink-900);
+  border-left: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.wc-pane-link::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0) 0,
+    rgba(0, 0, 0, 0) 2px,
+    rgba(0, 0, 0, 0.22) 3px
+  );
+}
+
+.wc-link {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+}
+
+.wc-link-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--green);
+}
+
+.wc-link-dot {
+  width: 7px;
+  height: 7px;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: blink 1.2s steps(1) infinite;
+}
+
+.wc-link-core {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0;
+}
+
+.wc-link-mark {
+  width: 62px;
+  height: 62px;
+  animation: wcPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes wcPulse {
+  0%, 100% {
+    opacity: 0.5;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+.wc-link-bar {
+  position: relative;
+  height: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+
+.wc-link-bar span {
+  position: absolute;
+  top: 0;
+  left: -34%;
+  width: 34%;
+  height: 100%;
+  background: var(--green);
+  box-shadow: 0 0 8px var(--green);
+  animation: scanbar 1.3s ease-in-out infinite;
+}
+
+.wc-link-log {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+.wc-link-log li {
+  opacity: 0;
+  animation: logIn 0.4s ease forwards;
+}
+
+.wc-link-log li::before {
+  content: "› ";
+  color: var(--green-dim);
+}
+
+.wc-link-log li:nth-child(1) {
+  animation-delay: 0.25s;
+}
+
+.wc-link-log li:nth-child(2) {
+  animation-delay: 0.65s;
+}
+
+.wc-link-log li:nth-child(3) {
+  animation-delay: 1.05s;
+}
+
+.wc-link-log li:nth-child(4) {
+  animation-delay: 1.45s;
+}
+
+@keyframes logIn {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.wc-link-cur {
+  color: var(--text) !important;
+}
+
+.wc-link-cur::after {
+  content: "▋";
+  margin-left: 4px;
+  color: var(--green);
+  animation: blink 1s steps(1) infinite;
+}
+
+@media (max-width: 620px) {
+  .wc-grid {
+    grid-template-columns: 1fr;
+  }
+  .wc-pane-link {
+    border-left: 0;
+    border-top: 1px solid var(--line);
+    min-height: 200px;
+  }
 }
 
 /* Sci-fi console treatment, carried over from the boot intro. Flat, no glass. */

@@ -1,5 +1,5 @@
 <svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avow">
-  <rect width="512" height="512" rx="96" fill="#0b0d0e"/>
-  <circle cx="256" cy="256" r="150" stroke="#5fd08a" stroke-opacity="0.28" stroke-width="14"/>
-  <path d="M182 262 L236 316 L334 196" stroke="#5fd08a" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect width="512" height="512" rx="96" fill="#0a0b0c"/>
+  <path d="M154 388 L256 128 L358 388" stroke="#5fd08a" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M198 302 L238 342 L320 240" stroke="#74e09c" stroke-width="28" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

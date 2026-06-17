@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ConnectButton,
   useCurrentAccount,
   useSignPersonalMessage,
   useSignAndExecuteTransaction,
 } from "@mysten/dapp-kit";
+import { WalletConnect } from "./WalletConnect";
 import { Transaction } from "@mysten/sui/transactions";
 import { fetchRecords, fetchAccessId, type AnchoredRecord } from "./records";
 import { findCapForMandate } from "./caps";
@@ -37,11 +37,17 @@ function formatTime(ms: number): string {
 function Mark() {
   return (
     <svg viewBox="0 0 512 512" fill="none" aria-hidden="true">
-      <circle cx="256" cy="256" r="150" stroke="#5fd08a" strokeOpacity="0.28" strokeWidth="14" />
       <path
-        d="M182 262 L236 316 L334 196"
+        d="M150 392 L256 120 L362 392"
         stroke="#5fd08a"
-        strokeWidth="34"
+        strokeWidth="30"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M196 300 L238 342 L322 236"
+        stroke="#74e09c"
+        strokeWidth="26"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
@@ -212,7 +218,7 @@ export function App() {
               <span className="brand-line">proof, not trust</span>
             </div>
           </div>
-          <ConnectButton />
+          <WalletConnect />
         </div>
         <p className="lede">
           Money-moving AI agents ask you to trust their numbers. Avow makes them{" "}

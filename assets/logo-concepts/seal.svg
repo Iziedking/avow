@@ -1,0 +1,6 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avow seal concept">
+  <rect width="512" height="512" fill="#0a0b0c"/>
+  <polygon points="256,104 386,180 386,332 256,408 126,332 126,180" stroke="#3f8f60" stroke-width="14"/>
+  <polygon points="256,150 346,202 346,310 256,362 166,310 166,202" stroke="#1f5436" stroke-width="8"/>
+  <path d="M196 262 L240 308 L330 200" stroke="#5fd08a" stroke-width="30" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/avow-wordmark.png" width="460" alt="Avow — proof, not trust" />
+  <img src="assets/avow-wordmark.png" width="460" alt="Avow: proof, not trust" />
 </p>
 
 # Avow

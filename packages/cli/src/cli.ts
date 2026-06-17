@@ -29,7 +29,7 @@ import {
   type EvidenceBundle,
 } from "avow-sdk";
 
-const HELP = `avow — proof, not trust
+const HELP = `avow: proof, not trust
 
 Usage: avow <command> [options]
 

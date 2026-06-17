@@ -336,7 +336,7 @@ export function App() {
               <div className="record-main">
                 <div className="record-top">
                   <span className="badge">{r.actionType || "action"}</span>
-                  <span className="target">{r.target || "—"}</span>
+                  <span className="target">{r.target || "-"}</span>
                   <span className="amount tnum">{group(r.amount)}</span>
                   <span className={`status${v.status === "ok" ? " is-verified" : ""}`}>
                     {v.status === "ok" ? "verified" : "anchored"}

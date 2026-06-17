@@ -8,8 +8,8 @@ export const avowDark: ThemeVars = {
     modalOverlay: "none",
   },
   backgroundColors: {
-    primaryButton: "#e9ecee",
-    primaryButtonHover: "#ffffff",
+    primaryButton: "#1b2023",
+    primaryButtonHover: "#232a2e",
     outlineButtonHover: "#161a1c",
     walletItemHover: "#161a1c",
     walletItemSelected: "#1b2023",
@@ -25,7 +25,7 @@ export const avowDark: ThemeVars = {
     outlineButton: "#2f363a",
   },
   colors: {
-    primaryButton: "#0a0b0c",
+    primaryButton: "#e9ecee",
     outlineButton: "#e9ecee",
     body: "#e9ecee",
     bodyMuted: "#9aa3a8",

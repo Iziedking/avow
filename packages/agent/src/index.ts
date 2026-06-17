@@ -4,4 +4,5 @@
 export * from "./money";
 export * from "./policy";
 export * from "./local-money";
+export * from "./scenario-money";
 export * from "./agent";

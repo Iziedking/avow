@@ -106,6 +106,14 @@ The reference agent running one cycle (observe, decide, move, prove):
 npx tsx packages/agent/scripts/run.ts
 ```
 
+A full live experiment: the agent runs several cycles against a changing rate feed, moving when
+a better yield clears the threshold and holding when it does not, and anchors every move as a
+verifiable proof. It prints a mandate id you can paste into the dashboard or verify from the CLI:
+
+```bash
+npx tsx packages/agent/scripts/experiment.ts
+```
+
 The dashboard:
 
 ```bash

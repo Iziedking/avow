@@ -723,6 +723,51 @@ input:focus {
   background: var(--line-2);
 }
 
+/* For builders, the live packages as copyable command chips. */
+.foot-dev {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 0 0 24px;
+}
+
+.foot-dev-label {
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #5a9e77;
+}
+
+.foot-cmds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.foot-cmd {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  background: var(--ink-850);
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  padding: 7px 12px;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.foot-cmd:hover {
+  border-color: var(--green);
+  color: var(--text);
+}
+
+.foot-cmd-prompt {
+  color: var(--green);
+  user-select: none;
+}
+
 .foot-base {
   display: flex;
   justify-content: space-between;

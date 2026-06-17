@@ -519,10 +519,35 @@ export function App() {
               GitHub
             </a>
             <span className="foot-dot" />
+            <a href="https://www.npmjs.com/package/avow-sdk" target="_blank" rel="noreferrer">
+              npm
+            </a>
+            <span className="foot-dot" />
             <span>Sui · Walrus · Seal</span>
             <span className="foot-dot" />
             <span>Sui Overflow 2026 · Walrus track</span>
           </nav>
+        </div>
+        <div className="foot-dev">
+          <span className="foot-dev-label">Build on it</span>
+          <div className="foot-cmds">
+            <a
+              className="foot-cmd"
+              href="https://www.npmjs.com/package/avow-cli"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="foot-cmd-prompt">$</span> npm i -g avow-cli
+            </a>
+            <a
+              className="foot-cmd"
+              href="https://www.npmjs.com/package/avow-sdk"
+              target="_blank"
+              rel="noreferrer"
+            >
+              <span className="foot-cmd-prompt">$</span> npm i avow-sdk
+            </a>
+          </div>
         </div>
         <div className="foot-base">
           <span>Apache-2.0</span>

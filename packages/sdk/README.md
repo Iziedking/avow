@@ -100,7 +100,7 @@ allowed. It checks the agent rather than trusting it.
 Before an agent can anchor, its owner sets a mandate: the single agent address, a cap per
 action, a per-epoch cap, an optional target allowlist, and an expiry. The owner then creates
 the evidence access that holds the Seal policy. The quickstart in
-[`examples/quickstart`](../../examples/quickstart) has a `create-mandate` script that does
+[`examples/quickstart`](https://github.com/Iziedking/avow/tree/main/examples/quickstart) has a `create-mandate` script that does
 both and prints the two ids you paste above.
 
 ## Configuration

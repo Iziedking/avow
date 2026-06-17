@@ -27,11 +27,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/avow-trust/avow.git",
+    "url": "git+https://github.com/Iziedking/avow.git",
     "directory": "packages/sdk"
   },
-  "homepage": "https://github.com/avow-trust/avow#readme",
-  "bugs": "https://github.com/avow-trust/avow/issues",
+  "homepage": "https://github.com/Iziedking/avow#readme",
+  "bugs": "https://github.com/Iziedking/avow/issues",
   "keywords": [
     "sui",
     "walrus",

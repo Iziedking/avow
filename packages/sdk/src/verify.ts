@@ -8,12 +8,34 @@
 import { Transaction } from "@mysten/sui/transactions";
 import { fromHex, toHex } from "@mysten/sui/utils";
 import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import { EncryptedObject } from "@mysten/seal";
-import type { SealClient, SessionKey } from "@mysten/seal";
+import type { Signer } from "@mysten/sui/cryptography";
+import { EncryptedObject, SessionKey } from "@mysten/seal";
+import type { SealClient } from "@mysten/seal";
 import type { WalrusClient } from "@mysten/walrus";
 import { PACKAGE_ID } from "./config";
 import { encodeBundle, sha256 } from "./hash";
 import type { AnchoredRecord, EvidenceBundle, VerifyResult } from "./types";
+
+/**
+ * Build a Seal session key signed by a signer that holds its key locally, for example in a
+ * CLI or an agent. In a browser, build the SessionKey and sign its personal message with the
+ * connected wallet instead.
+ */
+export async function createSession(
+  suiClient: SuiJsonRpcClient,
+  signer: Signer,
+  ttlMin = 10,
+): Promise<SessionKey> {
+  const session = await SessionKey.create({
+    address: signer.toSuiAddress(),
+    packageId: PACKAGE_ID,
+    ttlMin,
+    suiClient,
+  });
+  const { signature } = await signer.signPersonalMessage(session.getPersonalMessage());
+  await session.setPersonalMessageSignature(signature);
+  return session;
+}
 
 const READ_RETRIES = 5;
 const READ_BACKOFF_MS = 1500;

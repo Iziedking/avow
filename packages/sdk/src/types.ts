@@ -55,6 +55,10 @@ export interface AnchoredRecord {
   actionType: string;
   target: string;
   epoch: string;
+  /** Digest of the transaction that emitted the anchor, when read from an event. */
+  txDigest?: string;
+  /** When the anchor was emitted, in milliseconds, when available. */
+  timestampMs?: number;
 }
 
 export interface VerifyResult {

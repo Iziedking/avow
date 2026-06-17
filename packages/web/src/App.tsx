@@ -8,6 +8,7 @@ import {
 import { Transaction } from "@mysten/sui/transactions";
 import { fetchRecords, fetchAccessId, type AnchoredRecord } from "./records";
 import { findCapForMandate } from "./caps";
+import { setupMandate } from "./setup";
 import { verifyRecord } from "./verify";
 import { DEMO_MANDATE_ID, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
@@ -42,6 +43,16 @@ export function App() {
   const [grant, setGrant] = useState<{ status: "idle" | "running" | "ok" | "fail"; msg?: string }>(
     { status: "idle" },
   );
+
+  const [setupOpen, setSetupOpen] = useState(false);
+  const [setupAgent, setSetupAgent] = useState("");
+  const [setupPerMove, setSetupPerMove] = useState("");
+  const [setupDaily, setSetupDaily] = useState("");
+  const [setupState, setSetupState] = useState<{
+    status: "idle" | "running" | "ok" | "fail";
+    result?: { mandateId: string; accessId: string; capId: string };
+    error?: string;
+  }>({ status: "idle" });
 
   const account = useCurrentAccount();
   const { mutateAsync: signPersonalMessage } = useSignPersonalMessage();
@@ -127,6 +138,24 @@ export function App() {
     [account, signPersonalMessage],
   );
 
+  const onSetup = useCallback(async () => {
+    if (!account) return;
+    setSetupState({ status: "running" });
+    try {
+      const result = await setupMandate((input) => signAndExecute(input), {
+        agent: setupAgent.trim() || account.address,
+        perMoveCap: BigInt(setupPerMove || "0"),
+        dailyCap: BigInt(setupDaily || "0"),
+        expiryEpoch: 100000n,
+      });
+      setSetupState({ status: "ok", result });
+      setInput(result.mandateId);
+      setMandateId(result.mandateId);
+    } catch (e) {
+      setSetupState({ status: "fail", error: e instanceof Error ? e.message : String(e) });
+    }
+  }, [account, setupAgent, setupPerMove, setupDaily, signAndExecute]);
+
   const moves = records.length;
   const totalMoved = records.reduce((sum, r) => sum + BigInt(r.amount || "0"), 0n);
 
@@ -162,6 +191,65 @@ export function App() {
           <button onClick={() => setMandateId(input)}>Load record</button>
         </div>
       </section>
+
+      {account && (
+        <section className="setup">
+          <button className="setup-toggle" onClick={() => setSetupOpen((o) => !o)}>
+            {setupOpen ? "Hide setup" : "Set up an agent"}
+          </button>
+          {setupOpen && (
+            <div className="setup-body">
+              <p className="setup-hint">
+                Create a mandate for your agent. You become the owner. The agent address you
+                name is the only one that can anchor against it.
+              </p>
+              <div className="setup-grid">
+                <label>
+                  <span>Agent address</span>
+                  <input
+                    value={setupAgent}
+                    placeholder={account.address}
+                    spellCheck={false}
+                    onChange={(e) => setSetupAgent(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Per-move cap</span>
+                  <input
+                    value={setupPerMove}
+                    placeholder="1000000"
+                    onChange={(e) => setSetupPerMove(e.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>Daily cap</span>
+                  <input
+                    value={setupDaily}
+                    placeholder="10000000"
+                    onChange={(e) => setSetupDaily(e.target.value)}
+                  />
+                </label>
+              </div>
+              <button
+                className="setup-create"
+                onClick={onSetup}
+                disabled={setupState.status === "running"}
+              >
+                {setupState.status === "running" ? "creating…" : "create mandate"}
+              </button>
+              {setupState.status === "ok" && setupState.result && (
+                <div className="verify-result ok">
+                  Created and loaded above. mandate {setupState.result.mandateId.slice(0, 10)}…
+                  access {setupState.result.accessId.slice(0, 10)}…
+                </div>
+              )}
+              {setupState.status === "fail" && (
+                <div className="verify-result fail">{setupState.error}</div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       <section className="summary">
         <div className="stat">

@@ -8,5 +8,7 @@ export * from "./config";
 export * from "./clients";
 export * from "./types";
 export * from "./hash";
+export * from "./records";
+export * from "./mandate";
 export * from "./anchor";
 export * from "./verify";

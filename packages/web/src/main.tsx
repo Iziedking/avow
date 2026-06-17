@@ -23,7 +23,12 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <SuiClientProvider networks={networks} defaultNetwork="testnet">
-        <WalletProvider autoConnect theme={avowDark}>
+        <WalletProvider
+          autoConnect
+          theme={avowDark}
+          slushWallet={{ name: "Avow" }}
+          preferredWallets={["Slush", "OKX Wallet", "Bitget Wallet", "Suiet"]}
+        >
           <App />
         </WalletProvider>
       </SuiClientProvider>

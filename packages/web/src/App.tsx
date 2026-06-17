@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  ConnectButton,
   useCurrentAccount,
   useSignPersonalMessage,
   useSignAndExecuteTransaction,
 } from "@mysten/dapp-kit";
-import { WalletConnect } from "./WalletConnect";
 import { Transaction } from "@mysten/sui/transactions";
 import { fetchRecords, fetchAccessId, type AnchoredRecord } from "./records";
 import { findCapForMandate } from "./caps";
@@ -212,7 +212,7 @@ export function App() {
               <span className="brand-line">proof, not trust</span>
             </div>
           </div>
-          <WalletConnect />
+          <ConnectButton />
         </div>
         <p className="lede">
           Money-moving AI agents ask you to trust their numbers. Avow makes them{" "}

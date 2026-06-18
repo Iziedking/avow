@@ -32,6 +32,12 @@ export const DEMO_AGENTS: DemoAgent[] = [
 // Shown by default: the consumer bill payer.
 export const DEMO_MANDATE_ID = DEMO_AGENTS[0].mandateId;
 
+// A read-only key, pre-granted as an auditor on the demo agents above, so anyone can verify them
+// on the dashboard without owning them or connecting a wallet. It can ONLY decrypt the demo
+// agents' sealed evidence, it holds no funds and cannot anchor, grant, or sign anything else.
+export const DEMO_READER_KEY =
+  "suiprivkey1qqfmvq2cdp242jnrvqr0hutlzkr5lrhvxlny3g7vxmt9wuw4lcjqs7m46s3";
+
 export const SUISCAN = `https://suiscan.xyz/${NETWORK}`;
 export const WALRUS_AGGREGATOR = "https://aggregator.walrus-testnet.walrus.space";
 

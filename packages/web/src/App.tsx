@@ -19,6 +19,7 @@ import { findCapForMandate } from "./caps";
 import { setupMandate } from "./setup";
 import { verifyRecord, type SignPersonalMessage } from "./verify";
 import { describeObserved } from "./reveal";
+import { isDemoMandate, demoReaderAddress, demoReaderSign } from "./demoReader";
 import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
 import type { SignAndExecute } from "./anchorLive";
@@ -299,14 +300,20 @@ export function App() {
 
   const onVerify = useCallback(
     async (r: AnchoredRecord) => {
-      if (!account) return;
+      // Demo agents verify through the demo reader; others need the connected wallet.
+      const demo = isDemoMandate(r.mandateId);
+      const reader = demo ? demoReaderAddress : account?.address;
+      const sign: SignPersonalMessage = demo
+        ? demoReaderSign
+        : async ({ message }) => {
+            const res = await signPersonalMessage({ message });
+            return { signature: res.signature };
+          };
+      if (!reader) return;
       const key = r.txDigest ?? r.blobId;
       setVerify((s) => ({ ...s, [key]: { status: "running" } }));
       try {
-        const out = await verifyRecord(r, account.address, async ({ message }) => {
-          const res = await signPersonalMessage({ message });
-          return { signature: res.signature };
-        });
+        const out = await verifyRecord(r, reader, sign);
         setVerify((s) => ({
           ...s,
           [key]: {
@@ -388,6 +395,21 @@ export function App() {
     const res = await signPersonalMessage({ message });
     return { signature: res.signature };
   };
+
+  // Demo agents can be verified by anyone through the pre-granted demo reader; for any other
+  // agent, the connected wallet must be an authorized reader.
+  const isDemo = isDemoMandate(mandateId);
+  const readerAddress = isDemo ? demoReaderAddress : account?.address;
+  const readerSign: SignPersonalMessage = isDemo ? demoReaderSign : verifySign;
+
+  const agentIdHelp = (
+    <span
+      className="help"
+      title="An agent id is its mandate id: the on-chain rulebook and identity Avow gave the agent when it was registered. Every action it records is tied to this id, so pasting it loads that agent's full, provable history."
+    >
+      agent id
+    </span>
+  );
 
   return (
     <>
@@ -634,27 +656,17 @@ export function App() {
         )}
 
         <p className="finder-hint">
-          {account && myMandates.length > 0 ? (
+          {!account ? (
             <>
-              Or paste any{" "}
-              <span
-                className="help"
-                title="An agent id is its mandate id: the on-chain rulebook and identity Avow gave the agent when it was registered. Every action it records is tied to this id, so pasting it loads that agent's full, provable history."
-              >
-                agent id
-              </span>{" "}
-              to inspect another.
+              Connect your wallet to see the agents you own, or paste any {agentIdHelp} to verify
+              it. You see what the agent really did and how it reasoned, you never just trust it.
             </>
+          ) : myMandates.length > 0 ? (
+            <>Or paste another {agentIdHelp} to inspect a different agent.</>
           ) : (
             <>
-              Connect your wallet to see your own agents, or paste any{" "}
-              <span
-                className="help"
-                title="An agent id is its mandate id: the on-chain rulebook and identity Avow gave the agent when it was registered. Every action it records is tied to this id, so pasting it loads that agent's full, provable history."
-              >
-                agent id
-              </span>
-              . You verify what the agent did, you never just trust it.
+              No agents are assigned to this wallet yet. Paste your agent's {agentIdHelp} to verify
+              what it did and how it reasoned, or try a demo agent below to see how it works.
             </>
           )}
         </p>
@@ -691,7 +703,11 @@ export function App() {
               ))}
             </div>
           ) : (
-            <button className="demo-toggle" onClick={() => setShowDemos(true)}>
+            <button
+              className="demo-toggle"
+              onClick={() => setShowDemos(true)}
+              title="Example agents we built with the Avow SDK and ran live. Open one to see how Avow verifies an agent's actions and reveals the reasoning behind every output."
+            >
               Or try one of our demo agents
             </button>
           )}
@@ -726,8 +742,11 @@ export function App() {
 
       {!mandateId && (
         <p className="pick-prompt">
-          Pick an agent to inspect. Connect your wallet to see your own, or try one of our demo
-          agents above. Then verify every action it took.
+          {!account
+            ? "Pick an agent to inspect. Connect your wallet to see the ones you own, or try a demo agent above. Then verify every action it took: what it did, why, and that it stayed within the rules."
+            : myMandates.length > 0
+              ? "Pick one of your agents above, or a demo agent, then verify every action it took."
+              : "You don't have any agent assigned to this wallet yet. Paste your agent's id above to verify it, or try a demo agent below to see how verification works."}
         </p>
       )}
 
@@ -759,8 +778,8 @@ export function App() {
 
       <AgentRun
         records={records}
-        account={account?.address}
-        verifySign={verifySign}
+        account={readerAddress}
+        verifySign={readerSign}
         perMoveCap={mandate?.perMoveCap ?? null}
         canAnchor={youAreAgent}
         showAnchor={mode === "build"}
@@ -858,12 +877,12 @@ export function App() {
                   </a>
                   <button
                     className="verify-btn"
-                    disabled={!account || v.status === "running"}
+                    disabled={!readerAddress || v.status === "running"}
                     onClick={() => onVerify(r)}
                   >
                     {v.status === "running"
                       ? "checking…"
-                      : account
+                      : readerAddress
                         ? "Verify it yourself"
                         : "Connect a wallet to verify"}
                   </button>

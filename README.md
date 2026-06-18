@@ -4,9 +4,11 @@
 
 # Avow
 
-**Proof, not trust.** Avow is a verifiable trust layer that any money-moving agent on Sui can
-plug into. Your agent does whatever it does. After each action it calls `anchor()`, and Avow
-turns that action into a private, tamper-proof record: the evidence is sealed with Seal,
+**Build agents with the Avow SDK so their actions are stored on Walrus, encrypted with Seal, and
+become verifiable and provable on Sui.**
+
+Proof, not trust. Your agent does whatever it does. After each action it calls `anchor()`, and
+Avow turns that action into a private, tamper-proof record: the evidence is sealed with Seal,
 stored on Walrus, and bound to an on-chain anchor that the agent's own mandate had to approve.
 Anyone the owner authorizes can later call `verify()` and confirm the record is real,
 unaltered, and within the limits that were set.

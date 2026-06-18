@@ -166,6 +166,10 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
   return (
     <article className="doc-article">
       <h2>What Avow is</h2>
+      <p className="doc-lead">
+        Build agents with the Avow SDK so their actions are stored on Walrus, encrypted with Seal,
+        and become verifiable and provable on Sui.
+      </p>
       <p>
         Money-moving AI agents ask you to trust their numbers. Avow makes them prove them. After
         an agent acts, it seals the evidence and stamps a tamper-proof anchor on chain. Anyone the

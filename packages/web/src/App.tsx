@@ -684,7 +684,7 @@ export function App() {
             </a>
             <span className="foot-dot" />
             <a href="https://www.npmjs.com/package/avow-sdk" target="_blank" rel="noreferrer">
-              npm
+              SDK
             </a>
             <span className="foot-dot" />
             <span>Sui · Walrus · Seal</span>

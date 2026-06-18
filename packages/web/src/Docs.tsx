@@ -6,7 +6,7 @@ type Section = "overview" | "sdk" | "cli";
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "sdk", label: "SDK" },
-  { id: "cli", label: "Command line" },
+  { id: "cli", label: "CLI" },
 ];
 
 function CodeBlock({ code, caption }: { code: string; caption?: string }) {
@@ -405,7 +405,7 @@ const created = await createMandate(sui, ownerKeypair, {
 function Cli() {
   return (
     <article className="doc-article">
-      <h2>Command line</h2>
+      <h2>CLI</h2>
       <p>
         Everything the SDK does is also a terminal command, through <code>avow-cli</code>. No code
         required. Install it once and the <code>avow</code> command is everywhere.

@@ -38,11 +38,15 @@ export async function verifyRecord(
   record: AnchoredRecord,
   readerAddress: string,
   signPersonalMessage: SignPersonalMessage,
+  onStep?: (message: string) => void,
 ): Promise<VerifyOutcome> {
+  const step = (m: string) => onStep?.(m);
   const client = suiClient();
+  step("reading the sealed evidence from Walrus…");
   const ciphertext = await fetchBlob(record.blobId);
 
   // Prove to the key servers that this reader may decrypt, by signing a short-lived session.
+  step("proving you are an authorized reader, sign in your wallet…");
   const sessionKey = await SessionKey.create({
     address: readerAddress,
     packageId: PACKAGE_ID,
@@ -66,8 +70,10 @@ export async function verifyRecord(
     serverConfigs: SEAL_KEY_SERVERS,
     verifyKeyServers: false,
   });
+  step("the key servers are releasing a decryption key…");
   const plaintext = await seal.decrypt({ data: ciphertext, sessionKey, txBytes });
 
+  step("recomputing the fingerprint and matching the anchor…");
   const recomputedHashHex = await sha256Hex(plaintext);
   const bundle = JSON.parse(new TextDecoder().decode(plaintext)) as Record<string, unknown>;
 

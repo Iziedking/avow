@@ -10,7 +10,8 @@ import { Transaction } from "@mysten/sui/transactions";
 import { fetchRecords, fetchAccessId, type AnchoredRecord } from "./records";
 import { findCapForMandate } from "./caps";
 import { setupMandate } from "./setup";
-import { verifyRecord } from "./verify";
+import { verifyRecord, type SignPersonalMessage } from "./verify";
+import { describeObserved } from "./reveal";
 import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
 import type { SignAndExecute } from "./anchorLive";
@@ -21,6 +22,7 @@ type VerifyStatus = "idle" | "running" | "ok" | "fail";
 interface VerifyState {
   status: VerifyStatus;
   rationale?: string;
+  observed?: unknown;
   error?: string;
 }
 
@@ -228,6 +230,7 @@ export function App() {
           [key]: {
             status: out.hashMatches ? "ok" : "fail",
             rationale: out.rationale,
+            observed: out.bundle?.observed,
             error: out.hashMatches ? undefined : "Recomputed hash did not match the anchor.",
           },
         }));
@@ -294,6 +297,10 @@ export function App() {
   const runAnchor: SignAndExecute = async ({ transaction }) => {
     const res = await signAndExecute({ transaction });
     return { digest: res.digest };
+  };
+  const verifySign: SignPersonalMessage = async ({ message }) => {
+    const res = await signPersonalMessage({ message });
+    return { signature: res.signature };
   };
 
   return (
@@ -362,7 +369,90 @@ export function App() {
         </div>
       </section>
 
+      <section className="setup">
+        <span className="label">Register an agent</span>
+        {!account ? (
+          <p className="finder-hint">
+            Connect your wallet (top right) to register an agent. You become the owner, and you
+            can leave the agent address blank to use this same wallet as the agent.
+          </p>
+        ) : (
+          <>
+            <p className="finder-hint">
+              Name your agent's wallet and set its limits. Leave the address blank and your
+              connected wallet becomes the agent, the quickest way to try it.
+            </p>
+            {!setupOpen && (
+              <button className="btn-green" onClick={() => setSetupOpen(true)}>
+                Register an agent
+              </button>
+            )}
+            {setupOpen && (
+              <div className="setup-body hud">
+                <div className="setup-grid">
+                  <label>
+                    <span>Agent address</span>
+                    <input
+                      value={setupAgent}
+                      placeholder={account.address}
+                      spellCheck={false}
+                      onChange={(e) => setSetupAgent(e.target.value)}
+                    />
+                    <em className="field-hint">
+                      Your agent's own wallet (the key its code signs with). Leave blank to use
+                      this wallet as the agent.
+                    </em>
+                  </label>
+                  <label>
+                    <span>Per-action limit</span>
+                    <input
+                      value={setupPerMove}
+                      placeholder="1000000"
+                      onChange={(e) => setSetupPerMove(e.target.value)}
+                    />
+                    <em className="field-hint">
+                      The most it can move in a single action, in the smallest unit.
+                    </em>
+                  </label>
+                  <label>
+                    <span>Daily limit</span>
+                    <input
+                      value={setupDaily}
+                      placeholder="10000000"
+                      onChange={(e) => setSetupDaily(e.target.value)}
+                    />
+                    <em className="field-hint">The most it can move per day, added up.</em>
+                  </label>
+                </div>
+                <button
+                  className="btn-green"
+                  onClick={onSetup}
+                  disabled={setupState.status === "running"}
+                  style={{ padding: "10px 18px" }}
+                >
+                  {setupState.status === "running" ? "creating…" : "Create mandate"}
+                </button>
+                {setupState.status === "ok" && setupState.result && (
+                  <div className="verify-result ok">
+                    <strong>Created and loaded below.</strong> mandate{" "}
+                    {short(setupState.result.mandateId)} · access{" "}
+                    {short(setupState.result.accessId)}. You are the agent, so you can create a
+                    live proof in the panel below.
+                  </div>
+                )}
+                {setupState.status === "fail" && (
+                  <div className="verify-result fail">{setupState.error}</div>
+                )}
+              </div>
+            )}
+          </>
+        )}
+      </section>
+
       <AgentRun
+        records={records}
+        account={account?.address}
+        verifySign={verifySign}
         canAnchor={youAreAgent}
         connected={!!account}
         agentAddress={account?.address}
@@ -396,79 +486,6 @@ export function App() {
           </button>
         </div>
       </section>
-
-      {account && (
-        <section className="setup">
-          <button className="btn-ghost" onClick={() => setSetupOpen((o) => !o)}>
-            {setupOpen ? "Hide" : "Register an agent"}
-          </button>
-          {setupOpen && (
-            <div className="setup-body hud">
-              <p className="setup-hint">
-                Avow doesn't run your agent. This connected wallet becomes the owner. You name
-                your agent's own wallet, the key your agent's code signs with, and set the limits
-                it must stay inside. Only that agent wallet can record actions here. After that,
-                every move it makes shows up below, saved and proven, so you can always see what it
-                did and that it stayed in budget. (Testing solo? You can use this same wallet as
-                the agent.)
-              </p>
-              <div className="setup-grid">
-                <label>
-                  <span>Agent address</span>
-                  <input
-                    value={setupAgent}
-                    placeholder={account.address}
-                    spellCheck={false}
-                    onChange={(e) => setSetupAgent(e.target.value)}
-                  />
-                  <em className="field-hint">
-                    Your agent's own wallet (the key its code signs with), not this one. Only it
-                    can record actions. Leave blank to use this wallet for testing.
-                  </em>
-                </label>
-                <label>
-                  <span>Per-action limit</span>
-                  <input
-                    value={setupPerMove}
-                    placeholder="1000000"
-                    onChange={(e) => setSetupPerMove(e.target.value)}
-                  />
-                  <em className="field-hint">
-                    The most it can move in a single action, in the smallest unit.
-                  </em>
-                </label>
-                <label>
-                  <span>Daily limit</span>
-                  <input
-                    value={setupDaily}
-                    placeholder="10000000"
-                    onChange={(e) => setSetupDaily(e.target.value)}
-                  />
-                  <em className="field-hint">The most it can move per day, added up.</em>
-                </label>
-              </div>
-              <button
-                className="btn-green"
-                onClick={onSetup}
-                disabled={setupState.status === "running"}
-                style={{ padding: "10px 18px" }}
-              >
-                {setupState.status === "running" ? "creating…" : "Create mandate"}
-              </button>
-              {setupState.status === "ok" && setupState.result && (
-                <div className="verify-result ok">
-                  <strong>Created and loaded above.</strong> mandate{" "}
-                  {short(setupState.result.mandateId)} · access{" "}
-                  {short(setupState.result.accessId)}
-                </div>
-              )}
-              {setupState.status === "fail" && (
-                <div className="verify-result fail">{setupState.error}</div>
-              )}
-            </div>
-          )}
-        </section>
-      )}
 
       {capId && (
         <section className="owner-panel hud">
@@ -605,8 +622,24 @@ export function App() {
 
                 {v.status === "ok" && (
                   <div className="verify-result ok">
-                    <strong>Verified.</strong> The evidence is unaltered and the move stayed
-                    within the rules. The agent's own reasoning: “{v.rationale}”
+                    <strong>Verified.</strong> The evidence is unaltered and the action stayed
+                    within the rules. This is what the agent sealed, now unsealed for you:
+                    {describeObserved(v.observed).length > 0 && (
+                      <div className="reveal-block">
+                        <span className="reveal-k">what it saw</span>
+                        <ul className="reveal-list">
+                          {describeObserved(v.observed).map((line, j) => (
+                            <li key={j}>{line}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                    {v.rationale && (
+                      <div className="reveal-block">
+                        <span className="reveal-k">why it acted</span>
+                        <p className="reveal-why">“{v.rationale}”</p>
+                      </div>
+                    )}
                   </div>
                 )}
                 {v.status === "fail" && (

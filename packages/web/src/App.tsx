@@ -12,6 +12,7 @@ import { findCapForMandate } from "./caps";
 import { setupMandate } from "./setup";
 import { verifyRecord } from "./verify";
 import { Intro } from "./intro/Intro";
+import { beep } from "./beep";
 import { DEMO_MANDATE_ID, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
 type VerifyStatus = "idle" | "running" | "ok" | "fail";
@@ -35,9 +36,18 @@ function formatTime(ms: number): string {
   return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
-// Turn a data code like "yield_move" into a readable phrase like "Yield move".
+// Turn a data code like "yield_move" into a clear, professional label.
+const ACTION_LABELS: Record<string, string> = {
+  yield_move: "Yield rebalance",
+  payment: "Payment",
+  trade: "Trade",
+  transfer: "Transfer",
+};
+
 function prettyAction(type: string): string {
   if (!type) return "Action";
+  const known = ACTION_LABELS[type.toLowerCase()];
+  if (known) return known;
   const words = type.replace(/[_-]+/g, " ").trim();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -109,6 +119,25 @@ export function App() {
       return true;
     }
   });
+
+  // The page-load motion should run when the page is actually on screen, which is after the
+  // intro hands off (or immediately when the intro is skipped), not while it is still covered.
+  const [started, setStarted] = useState(false);
+  useEffect(() => {
+    if (!showIntro) setStarted(true);
+  }, [showIntro]);
+
+  // Read the three steps out as they drop in: one electronic blip each, rising in pitch.
+  useEffect(() => {
+    if (!started) return;
+    const cues: [number, number][] = [
+      [120, 660],
+      [420, 830],
+      [720, 990],
+    ];
+    const timers = cues.map(([ms, hz]) => window.setTimeout(() => beep(hz), ms));
+    return () => timers.forEach((t) => window.clearTimeout(t));
+  }, [started]);
 
   const account = useCurrentAccount();
   const { mutateAsync: signPersonalMessage } = useSignPersonalMessage();
@@ -273,13 +302,13 @@ export function App() {
         </div>
         <p className="lede">
           Money-moving AI agents ask you to trust their numbers. Avow makes them{" "}
-          <strong>prove</strong> them. Every move an agent makes is locked away on Walrus and
+          <strong>prove</strong> them. Every action an agent takes is locked away on Walrus and
           stamped on chain, so you, or anyone you allow, can check exactly what it did and that
           it stayed within the limits you set.
         </p>
       </header>
 
-      <section className="how hud">
+      <section className={`how hud${started ? " play" : ""}`}>
         <div className="how-step">
           <span className="how-n">1</span>
           <div>
@@ -292,8 +321,8 @@ export function App() {
           <div>
             <h3>The agent acts, and proves it</h3>
             <p>
-              After each move it seals the details and stamps a proof on chain. A move that
-              breaks your rules cannot produce a proof.
+              After each action it seals the details and stamps a proof on chain. An action
+              that breaks your rules cannot produce a proof.
             </p>
           </div>
         </div>
@@ -354,22 +383,27 @@ export function App() {
                     spellCheck={false}
                     onChange={(e) => setSetupAgent(e.target.value)}
                   />
+                  <em className="field-hint">The one wallet allowed to act under these rules.</em>
                 </label>
                 <label>
-                  <span>Per-move cap</span>
+                  <span>Per-action limit</span>
                   <input
                     value={setupPerMove}
                     placeholder="1000000"
                     onChange={(e) => setSetupPerMove(e.target.value)}
                   />
+                  <em className="field-hint">
+                    The most it can move in a single action, in the smallest unit.
+                  </em>
                 </label>
                 <label>
-                  <span>Daily cap</span>
+                  <span>Daily limit</span>
                   <input
                     value={setupDaily}
                     placeholder="10000000"
                     onChange={(e) => setSetupDaily(e.target.value)}
                   />
+                  <em className="field-hint">The most it can move per day, added up.</em>
                 </label>
               </div>
               <button
@@ -424,7 +458,7 @@ export function App() {
       <section className="summary hud">
         <div className="stat">
           <span className="stat-num">{moves}</span>
-          <span className="stat-label">moves recorded</span>
+          <span className="stat-label">actions recorded</span>
         </div>
         <div className="stat">
           <span className="stat-num tnum">{group(totalMoved.toString())}</span>

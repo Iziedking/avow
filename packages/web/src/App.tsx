@@ -12,6 +12,7 @@ import { findCapForMandate } from "./caps";
 import { setupMandate } from "./setup";
 import { verifyRecord } from "./verify";
 import { Intro } from "./intro/Intro";
+import { AgentRun } from "./AgentRun";
 import { beep } from "./beep";
 import { DEMO_MANDATE_ID, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
@@ -301,10 +302,10 @@ export function App() {
           <WalletConnect />
         </div>
         <p className="lede">
-          Money-moving AI agents ask you to trust their numbers. Avow makes them{" "}
-          <strong>prove</strong> them. Every action an agent takes is locked away on Walrus and
-          stamped on chain, so you, or anyone you allow, can check exactly what it did and that
-          it stayed within the limits you set.
+          AI agents move real money and ask you to trust the results. Avow makes them{" "}
+          <strong>show their work</strong>. Everything your agent does is saved, sealed so only
+          you and people you allow can read it, and proven on chain. So you see what it really
+          did, not just what it claims.
         </p>
       </header>
 
@@ -313,7 +314,7 @@ export function App() {
           <span className="how-n">1</span>
           <div>
             <h3>You set the rules</h3>
-            <p>Decide what your agent may do: how much it can move, where, and for how long.</p>
+            <p>Decide what your agent is allowed to do: how much it can move, where, and for how long.</p>
           </div>
         </div>
         <div className="how-step">
@@ -321,8 +322,8 @@ export function App() {
           <div>
             <h3>The agent acts, and proves it</h3>
             <p>
-              After each action it seals the details and stamps a proof on chain. An action
-              that breaks your rules cannot produce a proof.
+              Each time it acts, it saves what it did and why, and locks in a proof. An action
+              that breaks your rules can't make a proof, so it can't hide it.
             </p>
           </div>
         </div>
@@ -331,12 +332,14 @@ export function App() {
           <div>
             <h3>Anyone you allow can check</h3>
             <p>
-              Open a proof, unlock the details, and confirm it is real and within your rules.
-              No trust required.
+              Open any action to see what it did, why, and that it stayed within your rules.
+              No trust needed.
             </p>
           </div>
         </div>
       </section>
+
+      <AgentRun />
 
       <section className="finder">
         <label className="label" htmlFor="mandate">
@@ -371,12 +374,12 @@ export function App() {
           {setupOpen && (
             <div className="setup-body hud">
               <p className="setup-hint">
-                Avow does not run your agent, it proves what your agent does. Here you register
-                your agent's wallet and the limits it must stay within, and you become the
-                owner. From then on your agent records every action against these rules through
-                the SDK, its full reasoning sealed on Walrus and the proof anchored on chain, so
-                you or anyone you allow can open any action below and confirm what it did and
-                that it stayed in budget.
+                Avow doesn't run your agent. This connected wallet becomes the owner. You name
+                your agent's own wallet, the key your agent's code signs with, and set the limits
+                it must stay inside. Only that agent wallet can record actions here. After that,
+                every move it makes shows up below, saved and proven, so you can always see what it
+                did and that it stayed in budget. (Testing solo? You can use this same wallet as
+                the agent.)
               </p>
               <div className="setup-grid">
                 <label>
@@ -387,7 +390,10 @@ export function App() {
                     spellCheck={false}
                     onChange={(e) => setSetupAgent(e.target.value)}
                   />
-                  <em className="field-hint">The one wallet allowed to act under these rules.</em>
+                  <em className="field-hint">
+                    Your agent's own wallet (the key its code signs with), not this one. Only it
+                    can record actions. Leave blank to use this wallet for testing.
+                  </em>
                 </label>
                 <label>
                   <span>Per-action limit</span>
@@ -475,9 +481,8 @@ export function App() {
         <span className="note mono">{short(mandateId, 8, 6)}</span>
       </div>
       <p className="records-intro reveal">
-        Every action this agent has recorded, newest first. You see the result here, and you can
-        open any one to reveal exactly what it did, the reasoning behind it, and proof it stayed
-        within the rules, you never have to take the numbers on trust.
+        Everything your agent has done, newest first. You see the result, and you can open any one
+        to see how it did it, why, and that it stayed within your limits. No trust needed.
       </p>
 
       {status === "loading" && (

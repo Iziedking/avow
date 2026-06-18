@@ -162,6 +162,60 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
         </div>
       </div>
 
+      <h3>Who's who</h3>
+      <p>
+        Three roles, which can be one wallet or three. Keeping them straight is the thing most
+        people miss.
+      </p>
+      <div className="doc-two">
+        <div className="doc-card">
+          <span className="doc-card-k">role</span>
+          <h3>Owner</h3>
+          <p>
+            Creates the mandate and the evidence vault, holds the admin cap, sets the rules,
+            grants auditors, can revoke. Allowed to read its own evidence. On the dashboard, the
+            wallet you connect is the owner.
+          </p>
+        </div>
+        <div className="doc-card">
+          <span className="doc-card-k">role</span>
+          <h3>Agent</h3>
+          <p>
+            The wallet your agent's code signs with. Its address is named in the mandate, and the
+            contract lets only that address record actions. This is a key your program holds, not
+            a person's wallet.
+          </p>
+        </div>
+        <div className="doc-card">
+          <span className="doc-card-k">role</span>
+          <h3>Auditor</h3>
+          <p>
+            Any address the owner grants read access, so they can verify the record without being
+            trusted with anything else. Investors, compliance, a user.
+          </p>
+        </div>
+      </div>
+      <p className="doc-muted">
+        Testing solo? One wallet can be all three: create it, name it as the agent, and it owns
+        and reads too. That is the quickest start, just know the roles are really separate.
+      </p>
+
+      <h3>Where the reasoning comes from</h3>
+      <p>
+        Avow does not read your agent's mind. The wallet is only identity. The reasoning is
+        whatever your code puts in the evidence bundle: <code>rationale</code> for the why,{" "}
+        <code>observed</code> for the data it saw, <code>txDigests</code> for the real
+        transactions. For an LLM agent, you drop the model's prompt and output into{" "}
+        <code>rationale</code> and the data it was fed into <code>observed</code>, then call{" "}
+        <code>anchor()</code>. Avow seals and proves exactly what you record.
+      </p>
+      <p>
+        So it proves the agent <strong>committed</strong> to this reasoning at the time, sealed,
+        attributable, within the rules, and provably unaltered since. It does not prove the model
+        "truly thought" it. That is the honest and the stronger claim: not "trust my reasoning"
+        but "here is the reasoning I committed to, check it yourself."
+      </p>
+
       <h3>The flow</h3>
       <CodeBlock
         caption="lifecycle"

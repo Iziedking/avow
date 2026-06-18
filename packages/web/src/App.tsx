@@ -105,14 +105,23 @@ export function App() {
   const [recordsPage, setRecordsPage] = useState(0);
   const [myMandates, setMyMandates] = useState<string[]>([]);
 
-  // The consumer "verify" view is the default; "build" adds the developer tools.
+  // The consumer "verify" view is the default; "build" adds the developer tools. Remembered
+  // across refreshes, and ?dev forces it on.
   const [mode, setMode] = useState<"verify" | "build">(() => {
     try {
-      return new URLSearchParams(window.location.search).has("dev") ? "build" : "verify";
+      if (new URLSearchParams(window.location.search).has("dev")) return "build";
+      return localStorage.getItem("avow-mode") === "build" ? "build" : "verify";
     } catch {
       return "verify";
     }
   });
+  useEffect(() => {
+    try {
+      localStorage.setItem("avow-mode", mode);
+    } catch {
+      /* storage unavailable */
+    }
+  }, [mode]);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [soundMuted, setSoundMuted] = useState(() => {
     try {

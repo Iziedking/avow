@@ -1,14 +1,46 @@
-// The decision policy. Deliberately simple and legible: move only when a different target
-// beats the current one by more than the threshold, otherwise hold. The point of Avow is
-// the provable record, not the alpha, so the policy stays easy to read and explain.
+// The decision policy. Deliberately simple and legible, but risk-aware: a pool whose risk
+// exceeds the limit is ignored no matter how high its yield, and among the rest the agent
+// compares risk-adjusted yield (apy minus risk) and moves only when a different target beats
+// the current one by more than the threshold. The point of Avow is the provable record and the
+// readable reasoning, not the alpha, so the rationale spells out the whole decision.
 
-import type { Observation, Decision } from "./money";
+import type { Observation, Decision, RateQuote } from "./money";
 
-export function decide(obs: Observation, thresholdBps: number): Decision {
+export interface Policy {
+  /** Minimum risk-adjusted improvement, in bps, before the agent will move. */
+  thresholdBps: number;
+  /** Pools with a risk score above this are ignored, whatever their yield. */
+  maxRiskBps: number;
+}
+
+function pct(bps: number): string {
+  return `${(bps / 100).toFixed(2)}%`;
+}
+
+function riskAdjusted(r: RateQuote): number {
+  return r.apyBps - r.riskBps;
+}
+
+export function decide(obs: Observation, policy: Policy): Decision {
+  const { thresholdBps, maxRiskBps } = policy;
   const current = obs.current;
-  const currentRate = obs.rates.find((r) => r.target === current.target)?.apyBps ?? 0;
-  const best = obs.rates.reduce((a, b) => (b.apyBps > a.apyBps ? b : a));
-  const improvement = best.apyBps - currentRate;
+
+  const safe = obs.rates.filter((r) => r.riskBps <= maxRiskBps);
+  const excluded = obs.rates.filter((r) => r.riskBps > maxRiskBps && r.target !== "idle");
+
+  const currentQuote = obs.rates.find((r) => r.target === current.target);
+  const currentAdj = currentQuote ? riskAdjusted(currentQuote) : 0;
+
+  const best = safe.reduce((a, b) => (riskAdjusted(b) > riskAdjusted(a) ? b : a));
+  const bestAdj = riskAdjusted(best);
+  const improvement = bestAdj - currentAdj;
+
+  const skipped = excluded
+    .map((e) => `${e.target} (${pct(e.apyBps)} APY, risk ${e.riskBps}bps)`)
+    .join(", ");
+  const riskNote = excluded.length
+    ? `Ignored ${skipped} for exceeding the ${maxRiskBps}bps risk limit. `
+    : "";
 
   if (best.target === current.target || improvement < thresholdBps) {
     return {
@@ -18,8 +50,9 @@ export function decide(obs: Observation, thresholdBps: number): Decision {
       toTarget: current.target,
       amount: "0",
       rationale:
-        `Held. Best is ${best.target} at ${best.apyBps}bps, which does not beat ` +
-        `${current.target} at ${currentRate}bps by the ${thresholdBps}bps threshold.`,
+        riskNote +
+        `Best safe pool is ${best.target} at a risk-adjusted ${pct(bestAdj)}, which does not ` +
+        `beat ${current.target} at ${pct(currentAdj)} by the ${thresholdBps}bps threshold. Held.`,
       observed: obs.rates,
     };
   }
@@ -31,8 +64,10 @@ export function decide(obs: Observation, thresholdBps: number): Decision {
     toTarget: best.target,
     amount: current.amount,
     rationale:
-      `Moved from ${current.target} at ${currentRate}bps to ${best.target} at ` +
-      `${best.apyBps}bps, a ${improvement}bps gain over the ${thresholdBps}bps threshold.`,
+      riskNote +
+      `Moved ${current.target} to ${best.target}: a risk-adjusted ${pct(bestAdj)} ` +
+      `(${pct(best.apyBps)} APY minus ${best.riskBps}bps risk) beats ${current.target} at ` +
+      `${pct(currentAdj)} by ${improvement}bps, clearing the ${thresholdBps}bps threshold.`,
     observed: obs.rates,
   };
 }

@@ -27,9 +27,9 @@ export class LocalMoneyLayer implements MoneyLayer {
     return {
       asOfMs: Date.now(),
       rates: [
-        { target: "navi", apyBps: 530 },
-        { target: "scallop", apyBps: 415 },
-        { target: "idle", apyBps: 0 },
+        { target: "navi", apyBps: 530, riskBps: 25 },
+        { target: "scallop", apyBps: 415, riskBps: 60 },
+        { target: "idle", apyBps: 0, riskBps: 0 },
       ],
       current: this.current,
     };

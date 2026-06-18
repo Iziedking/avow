@@ -68,6 +68,7 @@ async function main() {
     accessId,
     money,
     thresholdBps: 50,
+    maxRiskBps: 150,
   });
 
   console.log(`decision: ${result.decision.rationale}`);

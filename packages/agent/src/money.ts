@@ -10,6 +10,8 @@ export interface RateQuote {
   target: string;
   /** Annual percentage yield in basis points. */
   apyBps: number;
+  /** A risk score in basis points, subtracted from the yield and capped by the policy. */
+  riskBps: number;
 }
 
 export interface Position {

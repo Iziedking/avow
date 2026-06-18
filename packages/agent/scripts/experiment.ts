@@ -15,16 +15,22 @@ import { ScenarioMoneyLayer } from "../src/scenario-money";
 import { runCycle } from "../src/agent";
 
 const THRESHOLD_BPS = 50;
+const MAX_RISK_BPS = 150;
 
-// Six cycles of yields. The agent should move at 1, 2 and 5, and hold at 3 (no target yet),
-// 4 (the gain is under the threshold) and 6 (already in the best target).
+// Six cycles of yields. degenpool always offers the highest APY but its risk (320bps) is over
+// the limit, so the agent ignores it every cycle, the discipline the proof is meant to show.
+// Among the safe pools it moves at 1, 3, 4 and 6, and holds at 2 (gain under the threshold) and
+// 5 (already in the best). Each rate is [apyBps, riskBps].
+function q(target: string, apyBps: number, riskBps: number): RateQuote {
+  return { target, apyBps, riskBps };
+}
 const SCHEDULE: RateQuote[][] = [
-  [{ target: "navi", apyBps: 530 }, { target: "scallop", apyBps: 415 }, { target: "idle", apyBps: 0 }],
-  [{ target: "navi", apyBps: 470 }, { target: "scallop", apyBps: 545 }, { target: "idle", apyBps: 0 }],
-  [{ target: "navi", apyBps: 505 }, { target: "scallop", apyBps: 530 }, { target: "idle", apyBps: 0 }],
-  [{ target: "navi", apyBps: 560 }, { target: "scallop", apyBps: 520 }, { target: "idle", apyBps: 0 }],
-  [{ target: "navi", apyBps: 640 }, { target: "scallop", apyBps: 500 }, { target: "idle", apyBps: 0 }],
-  [{ target: "navi", apyBps: 600 }, { target: "scallop", apyBps: 590 }, { target: "idle", apyBps: 0 }],
+  [q("navi", 530, 25), q("scallop", 415, 60), q("degenpool", 920, 320), q("idle", 0, 0)],
+  [q("navi", 470, 25), q("scallop", 545, 60), q("degenpool", 880, 320), q("idle", 0, 0)],
+  [q("navi", 460, 25), q("scallop", 560, 60), q("degenpool", 900, 320), q("idle", 0, 0)],
+  [q("navi", 600, 25), q("scallop", 540, 60), q("degenpool", 950, 320), q("idle", 0, 0)],
+  [q("navi", 590, 25), q("scallop", 585, 60), q("degenpool", 1000, 320), q("idle", 0, 0)],
+  [q("navi", 480, 25), q("scallop", 600, 60), q("degenpool", 870, 320), q("idle", 0, 0)],
 ];
 
 function loadKeypair(): Ed25519Keypair {
@@ -73,7 +79,10 @@ async function main() {
   console.log(`agent:    ${address}`);
   console.log(`mandate:  ${mandateId}`);
   console.log(`access:   ${accessId}`);
-  console.log(`rule:     move only when a target beats the current one by ${THRESHOLD_BPS}bps\n`);
+  console.log(
+    `rule:     ignore pools over ${MAX_RISK_BPS}bps risk, then move only when a safe pool beats ` +
+      `the current one by ${THRESHOLD_BPS}bps risk-adjusted\n`,
+  );
 
   let moves = 0;
   let holds = 0;
@@ -88,6 +97,7 @@ async function main() {
       accessId,
       money,
       thresholdBps: THRESHOLD_BPS,
+      maxRiskBps: MAX_RISK_BPS,
     });
 
     const n = String(i + 1).padStart(2, "0");

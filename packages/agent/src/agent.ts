@@ -21,6 +21,7 @@ export interface AgentConfig {
   accessId: string;
   money: MoneyLayer;
   thresholdBps: number;
+  maxRiskBps: number;
 }
 
 export interface CycleResult {
@@ -31,7 +32,10 @@ export interface CycleResult {
 
 export async function runCycle(cfg: AgentConfig): Promise<CycleResult> {
   const observation = await cfg.money.observe();
-  const decision = decide(observation, cfg.thresholdBps);
+  const decision = decide(observation, {
+    thresholdBps: cfg.thresholdBps,
+    maxRiskBps: cfg.maxRiskBps,
+  });
 
   if (!decision.move) {
     return { moved: false, decision };

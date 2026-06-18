@@ -131,9 +131,9 @@ export function App() {
   useEffect(() => {
     if (!started) return;
     const cues: [number, number][] = [
-      [120, 660],
-      [420, 830],
-      [720, 990],
+      [250, 660],
+      [900, 830],
+      [1550, 990],
     ];
     const timers = cues.map(([ms, hz]) => window.setTimeout(() => beep(hz), ms));
     return () => timers.forEach((t) => window.clearTimeout(t));
@@ -366,13 +366,17 @@ export function App() {
       {account && (
         <section className="setup">
           <button className="btn-ghost" onClick={() => setSetupOpen((o) => !o)}>
-            {setupOpen ? "Hide setup" : "Set up an agent"}
+            {setupOpen ? "Hide" : "Register an agent"}
           </button>
           {setupOpen && (
             <div className="setup-body hud">
               <p className="setup-hint">
-                Create a mandate for your agent. You become the owner. The agent address you
-                name is the only one that can anchor against it.
+                Avow does not run your agent, it proves what your agent does. Here you register
+                your agent's wallet and the limits it must stay within, and you become the
+                owner. From then on your agent records every action against these rules through
+                the SDK, its full reasoning sealed on Walrus and the proof anchored on chain, so
+                you or anyone you allow can open any action below and confirm what it did and
+                that it stayed in budget.
               </p>
               <div className="setup-grid">
                 <label>
@@ -471,8 +475,9 @@ export function App() {
         <span className="note mono">{short(mandateId, 8, 6)}</span>
       </div>
       <p className="records-intro reveal">
-        Every action this agent has recorded, newest first. Open any one and verify it
-        yourself, you never have to take the numbers on trust.
+        Every action this agent has recorded, newest first. You see the result here, and you can
+        open any one to reveal exactly what it did, the reasoning behind it, and proof it stayed
+        within the rules, you never have to take the numbers on trust.
       </p>
 
       {status === "loading" && (

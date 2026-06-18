@@ -1840,6 +1840,29 @@ body::before {
   animation: blink 1s steps(1) infinite;
 }
 
+.run-finale {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.run-finale .btn-green {
+  flex: none;
+  padding: 10px 18px;
+}
+
+.run-finale-hint {
+  flex: 1;
+  min-width: 200px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-faint);
+}
+
 @media (max-width: 560px) {
   .run-bar {
     flex-direction: column;

@@ -1,10 +1,12 @@
-// Watch the agent work. A live playback of the reference yield agent's real decision logic:
-// it reads the yields, compares them to where it sits now, and moves only when a better one
-// clears its threshold. The same six cycles that produced the proofs in the track record below.
-// Pure front-end narration, so it never stalls in a demo; the proofs it points at are real.
+// Watch the agent work, then anchor one real proof. The playback narrates the reference yield
+// agent's real decision logic over six cycles (front-end only, so it never stalls in a demo).
+// When the connected wallet is the agent of the loaded mandate, the finale creates one genuine
+// proof on the spot, signed by that wallet, and it appears in the track record below.
 
 import { useCallback, useRef, useState } from "react";
 import { beep } from "./beep";
+import { anchorLive, type SignAndExecute, type LiveAction } from "./anchorLive";
+import { SUISCAN } from "./config";
 
 interface Cycle {
   navi: number;
@@ -28,14 +30,27 @@ interface Line {
   kind: LineKind;
 }
 
+export interface AgentRunProps {
+  /** True when the connected wallet is the agent named in the loaded mandate. */
+  canAnchor: boolean;
+  agentAddress?: string;
+  mandateId: string;
+  accessId: string | null;
+  signAndExecute: SignAndExecute;
+  onAnchored: () => void;
+}
+
 function pct(bps: number): string {
   return `${(bps / 100).toFixed(2)}%`;
 }
 
-export function AgentRun() {
+export function AgentRun(props: AgentRunProps) {
   const [lines, setLines] = useState<Line[]>([]);
   const [running, setRunning] = useState(false);
+  const [anchoring, setAnchoring] = useState(false);
   const runId = useRef(0);
+
+  const push = useCallback((line: Line) => setLines((ls) => [...ls, line]), []);
 
   const run = useCallback(async () => {
     const id = ++runId.current;
@@ -44,7 +59,7 @@ export function AgentRun() {
 
     const alive = () => runId.current === id;
     const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
-    const push = (line: Line) => {
+    const add = (line: Line) => {
       if (alive()) setLines((ls) => [...ls, line]);
     };
 
@@ -54,18 +69,18 @@ export function AgentRun() {
 
     for (let i = 0; i < SCENARIO.length && alive(); i++) {
       const c = SCENARIO[i];
-      push({ text: `cycle ${String(i + 1).padStart(2, "0")}`, kind: "head" });
+      add({ text: `cycle ${String(i + 1).padStart(2, "0")}`, kind: "head" });
       beep(620);
       await wait(700);
 
-      push({ text: `reading yields from each protocol…`, kind: "think" });
+      add({ text: `reading yields from each protocol…`, kind: "think" });
       await wait(700);
-      push({ text: `navi ${pct(c.navi)}    scallop ${pct(c.scallop)}`, kind: "data" });
+      add({ text: `navi ${pct(c.navi)}    scallop ${pct(c.scallop)}`, kind: "data" });
       await wait(800);
 
       const best = c.navi >= c.scallop ? "navi" : "scallop";
       const bestApy = Math.max(c.navi, c.scallop);
-      push({
+      add({
         text: `best yield is ${best} at ${pct(bestApy)}, currently in ${current} at ${pct(currentApy)}`,
         kind: "think",
       });
@@ -73,23 +88,23 @@ export function AgentRun() {
 
       const gain = bestApy - currentApy;
       if (best === current) {
-        push({ text: `HOLD — already in the best yield, nothing to do`, kind: "hold" });
+        add({ text: `HOLD — already in the best yield, nothing to do`, kind: "hold" });
         beep(430);
       } else if (gain < THRESHOLD) {
-        push({
+        add({
           text: `HOLD — moving would only gain ${gain}bps, under the ${THRESHOLD}bps rule, not worth it`,
           kind: "hold",
         });
         beep(430);
       } else {
         moves += 1;
-        push({
+        add({
           text: `MOVE ${current} → ${best} — a ${gain}bps gain, clears the ${THRESHOLD}bps rule`,
           kind: "move",
         });
         beep(880);
         await wait(650);
-        push({ text: `sealing the evidence · storing on Walrus · proof on chain ✓`, kind: "proof" });
+        add({ text: `sealing the evidence · storing on Walrus · proof on chain ✓`, kind: "proof" });
         current = best;
         currentApy = bestApy;
       }
@@ -97,7 +112,7 @@ export function AgentRun() {
     }
 
     if (alive()) {
-      push({
+      add({
         text: `done. ${moves} moves, each sealed and proven. open any in the track record below and verify it yourself.`,
         kind: "done",
       });
@@ -105,6 +120,48 @@ export function AgentRun() {
       setRunning(false);
     }
   }, []);
+
+  const anchorOne = useCallback(async () => {
+    if (!props.canAnchor || !props.accessId || !props.agentAddress) return;
+    setAnchoring(true);
+    push({ text: `create a real proof, live`, kind: "head" });
+
+    const action: LiveAction = {
+      agent: props.agentAddress,
+      actionType: "yield_move",
+      target: "navi",
+      amount: "100000",
+      rationale: "Live proof from the dashboard: moved to navi, the best yield this cycle.",
+      observed: {
+        rates: [
+          { target: "navi", apyBps: 530 },
+          { target: "scallop", apyBps: 415 },
+        ],
+      },
+    };
+
+    try {
+      const result = await anchorLive({
+        address: props.agentAddress,
+        mandateId: props.mandateId,
+        accessId: props.accessId,
+        action,
+        signAndExecute: props.signAndExecute,
+        onStep: (m) => push({ text: m, kind: "think" }),
+      });
+      push({ text: `proof anchored ✓  ${SUISCAN}/tx/${result.anchorDigest}`, kind: "proof" });
+      push({ text: `it's in the track record below now. open it and verify.`, kind: "done" });
+      beep(990);
+      props.onAnchored();
+    } catch (e) {
+      push({
+        text: `could not anchor: ${e instanceof Error ? e.message : String(e)}`,
+        kind: "hold",
+      });
+    } finally {
+      setAnchoring(false);
+    }
+  }, [props, push]);
 
   return (
     <section className="run hud">
@@ -116,7 +173,7 @@ export function AgentRun() {
             the proofs below.
           </p>
         </div>
-        <button className="btn-green run-btn" onClick={run} disabled={running}>
+        <button className="btn-green run-btn" onClick={run} disabled={running || anchoring}>
           {running ? "running…" : lines.length ? "Run again" : "Run the agent"}
         </button>
       </div>
@@ -132,8 +189,21 @@ export function AgentRun() {
             </div>
           ))
         )}
-        {running && <span className="run-cursor" />}
+        {(running || anchoring) && <span className="run-cursor" />}
       </div>
+
+      {props.canAnchor && (
+        <div className="run-finale">
+          <button className="btn-green" onClick={anchorOne} disabled={anchoring || running}>
+            {anchoring ? "anchoring…" : "Create a real proof, live"}
+          </button>
+          <span className="run-finale-hint">
+            You are the agent of this mandate. This signs three times in your wallet (Walrus
+            register, certify, then anchor) and uses a little testnet SUI and WAL. The new proof
+            appears below.
+          </span>
+        </div>
+      )}
     </section>
   );
 }

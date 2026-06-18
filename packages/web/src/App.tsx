@@ -13,6 +13,7 @@ import { setupMandate } from "./setup";
 import { verifyRecord } from "./verify";
 import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
+import type { SignAndExecute } from "./anchorLive";
 import { beep } from "./beep";
 import { DEMO_MANDATE_ID, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
@@ -102,6 +103,11 @@ export function App() {
     result?: { mandateId: string; accessId: string; capId: string };
     error?: string;
   }>({ status: "idle" });
+
+  // A mandate this wallet just registered as its own agent, so the live-anchor finale can run.
+  const [liveTarget, setLiveTarget] = useState<{ mandateId: string; accessId: string } | null>(
+    null,
+  );
 
   const [docsOpen, setDocsOpen] = useState(() => {
     try {
@@ -256,13 +262,19 @@ export function App() {
     if (!account) return;
     setSetupState({ status: "running" });
     try {
+      const agentAddr = setupAgent.trim() || account.address;
       const result = await setupMandate((i) => signAndExecute(i), {
-        agent: setupAgent.trim() || account.address,
-        perMoveCap: BigInt(setupPerMove || "0"),
-        dailyCap: BigInt(setupDaily || "0"),
+        agent: agentAddr,
+        // Sensible non-zero defaults so a registered mandate can actually record actions.
+        perMoveCap: BigInt(setupPerMove || "1000000"),
+        dailyCap: BigInt(setupDaily || "10000000"),
         expiryEpoch: 100000n,
       });
       setSetupState({ status: "ok", result });
+      // If this wallet is the agent, it can create a live proof against the new mandate.
+      if (agentAddr === account.address) {
+        setLiveTarget({ mandateId: result.mandateId, accessId: result.accessId });
+      }
       setInput(result.mandateId);
       setMandateId(result.mandateId);
     } catch (e) {
@@ -272,6 +284,17 @@ export function App() {
 
   const moves = records.length;
   const totalMoved = records.reduce((sum, r) => sum + BigInt(r.amount || "0"), 0n);
+
+  // The live-anchor finale runs only when the connected wallet is the agent of this mandate.
+  const youAreAgent =
+    !!account &&
+    (liveTarget?.mandateId === mandateId ||
+      (records.length > 0 && records[0].agent === account.address));
+  const liveAccessId = liveTarget?.mandateId === mandateId ? liveTarget.accessId : accessId;
+  const runAnchor: SignAndExecute = async ({ transaction }) => {
+    const res = await signAndExecute({ transaction });
+    return { digest: res.digest };
+  };
 
   return (
     <>
@@ -339,7 +362,14 @@ export function App() {
         </div>
       </section>
 
-      <AgentRun />
+      <AgentRun
+        canAnchor={youAreAgent}
+        agentAddress={account?.address}
+        mandateId={mandateId}
+        accessId={liveAccessId}
+        signAndExecute={runAnchor}
+        onAnchored={() => load(mandateId)}
+      />
 
       <section className="finder">
         <label className="label" htmlFor="mandate">

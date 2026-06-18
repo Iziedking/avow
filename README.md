@@ -120,6 +120,28 @@ The dashboard:
 npm -w @avow/web run dev
 ```
 
+It opens on a real agent's track record. Watch the agent work plays the reference agent's
+decision logic live, and when you connect a wallet and register it as your own agent, the
+finale anchors one genuine proof on the spot, signed by that wallet, which then appears in the
+record for anyone to verify.
+
+## Roles: owner, agent, auditor
+
+Three roles, which can be one wallet (the quickest start) or three:
+
+- **Owner** creates the mandate and the evidence vault, sets the rules, grants auditors, can
+  revoke, and may read its own evidence. On the dashboard, the wallet you connect is the owner.
+- **Agent** is the wallet your agent's code signs with. Its address is named in the mandate, and
+  the contract lets only that address record actions. This is a key your program holds.
+- **Auditor** is any address the owner grants read access, so a third party can verify the
+  record without being trusted with anything else.
+
+The wallet is only identity. The reasoning is whatever your code puts in the evidence bundle
+(`rationale`, `observed`, `txDigests`). For an LLM agent, you put the model's prompt and output
+in `rationale` and the data it saw in `observed`. Avow then proves the agent committed to that
+reasoning, sealed, attributable, within the rules, and unaltered since, not that the model
+"truly thought" it. That honesty is the stronger claim.
+
 ## Integrate your own agent
 
 After your agent does its work, the whole integration is one call:

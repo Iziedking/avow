@@ -14,6 +14,12 @@ export const DEMO_MANDATE_ID =
 export const SUISCAN = `https://suiscan.xyz/${NETWORK}`;
 export const WALRUS_AGGREGATOR = "https://aggregator.walrus-testnet.walrus.space";
 
+// Writing evidence from the browser: the same upload relay and storage window the SDK uses.
+export const WALRUS_UPLOAD_RELAY = "https://upload-relay.testnet.walrus.space";
+export const WALRUS_TIP_MAX_MIST = 1_000_000;
+export const WALRUS_EPOCHS = 5;
+export const EVIDENCE_VERSION = 1;
+
 // Seal open-mode key servers (Mysten testnet), threshold 2. Same set the SDK uses, declared
 // here so the browser builds a Seal client without pulling the node-side SDK into the bundle.
 export const SEAL_KEY_SERVERS: { objectId: string; weight: number }[] = [

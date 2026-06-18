@@ -168,7 +168,7 @@ export function AgentRun(props: AgentRunProps) {
           <span className="run-title">See a proof</span>
           <p className="run-sub">
             This verifies the most recent proof and unseals its reasoning, live. To verify a
-            specific one, use the Verify button on any record in the track record above.
+            specific one, use the Verify button on any record in the track record below.
           </p>
         </div>
         <button className="btn-green run-btn" onClick={verifyLatest} disabled={!canVerify}>

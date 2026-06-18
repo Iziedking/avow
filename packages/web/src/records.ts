@@ -39,32 +39,47 @@ function toText(value: unknown): string {
   return new TextDecoder().decode(toBytes(value));
 }
 
+function parseAnchored(e: { parsedJson: unknown; id: { txDigest: string }; timestampMs?: string | null }): AnchoredRecord {
+  const j = e.parsedJson as Record<string, unknown>;
+  return {
+    mandateId: String(j.mandate_id),
+    accessId: String(j.access_id),
+    agent: String(j.agent),
+    blobId: toText(j.blob_id),
+    evidenceHashHex: toHex(toBytes(j.evidence_hash)),
+    amount: String(j.amount),
+    actionType: toText(j.action_type),
+    target: toText(j.target),
+    epoch: String(j.epoch),
+    txDigest: e.id.txDigest,
+    timestampMs: Number(e.timestampMs ?? 0),
+  };
+}
+
+// A mandate's records, and only that mandate's. Anchors from other mandates are filtered out,
+// so nobody's track record leaks into yours. The event feed is paged so a mandate's records
+// still surface once many agents are anchoring, not just within the latest global window.
 export async function fetchRecords(mandateId: string): Promise<AnchoredRecord[]> {
   const client = suiClient();
-  const res = await client.queryEvents({
-    query: { MoveEventType: `${PACKAGE_ID}::record::ActionAnchored` },
-    order: "descending",
-    limit: 50,
-  });
+  const mine: AnchoredRecord[] = [];
+  let cursor: { txDigest: string; eventSeq: string } | null | undefined = null;
 
-  const records = res.data.map((e): AnchoredRecord => {
-    const j = e.parsedJson as Record<string, unknown>;
-    return {
-      mandateId: String(j.mandate_id),
-      accessId: String(j.access_id),
-      agent: String(j.agent),
-      blobId: toText(j.blob_id),
-      evidenceHashHex: toHex(toBytes(j.evidence_hash)),
-      amount: String(j.amount),
-      actionType: toText(j.action_type),
-      target: toText(j.target),
-      epoch: String(j.epoch),
-      txDigest: e.id.txDigest,
-      timestampMs: Number(e.timestampMs ?? 0),
-    };
-  });
+  for (let page = 0; page < 8; page++) {
+    const res = await client.queryEvents({
+      query: { MoveEventType: `${PACKAGE_ID}::record::ActionAnchored` },
+      order: "descending",
+      limit: 50,
+      cursor,
+    });
+    for (const e of res.data) {
+      const r = parseAnchored(e);
+      if (r.mandateId === mandateId) mine.push(r);
+    }
+    if (!res.hasNextPage || !res.nextCursor || mine.length >= 200) break;
+    cursor = res.nextCursor;
+  }
 
-  return records.filter((r) => r.mandateId === mandateId);
+  return mine;
 }
 
 export interface MandateInfo {

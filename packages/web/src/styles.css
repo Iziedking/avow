@@ -565,6 +565,19 @@ input:focus {
   border-top: 1px solid var(--line);
 }
 
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.pager-at {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+
 .record {
   border-bottom: 1px solid var(--line);
   padding: 20px 0;

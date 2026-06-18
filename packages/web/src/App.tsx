@@ -98,6 +98,7 @@ export function App() {
   const [capId, setCapId] = useState<string | null>(null);
   const [accessId, setAccessId] = useState<string | null>(null);
   const [mandate, setMandate] = useState<MandateInfo | null>(null);
+  const [recordsPage, setRecordsPage] = useState(0);
   const [auditor, setAuditor] = useState("");
   const [grant, setGrant] = useState<{ status: "idle" | "running" | "ok" | "fail"; msg?: string }>(
     { status: "idle" },
@@ -163,6 +164,7 @@ export function App() {
     setStatus("loading");
     setError("");
     setVerify({});
+    setRecordsPage(0);
     try {
       setRecords(await fetchRecords(id.trim()));
       setStatus("idle");
@@ -297,6 +299,11 @@ export function App() {
 
   const moves = records.length;
   const totalMoved = records.reduce((sum, r) => sum + BigInt(r.amount || "0"), 0n);
+
+  const PER_PAGE = 6;
+  const pageCount = Math.max(1, Math.ceil(records.length / PER_PAGE));
+  const page = Math.min(recordsPage, pageCount - 1);
+  const pageRecords = records.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
 
   // The live-anchor finale runs only when the connected wallet is the agent of this mandate.
   const youAreAgent =
@@ -529,6 +536,20 @@ export function App() {
         </div>
       </section>
 
+      <AgentRun
+        records={records}
+        account={account?.address}
+        verifySign={verifySign}
+        perMoveCap={mandate?.perMoveCap ?? null}
+        canAnchor={youAreAgent}
+        connected={!!account}
+        agentAddress={account?.address}
+        mandateId={mandateId}
+        accessId={liveAccessId}
+        signAndExecute={runAnchor}
+        onAnchored={() => load(mandateId)}
+      />
+
       <div className="records-head reveal">
         <span className="records-title">Track record</span>
         <span className="note mono">{short(mandateId, 8, 6)}</span>
@@ -550,11 +571,12 @@ export function App() {
       )}
 
       <ul className="records">
-        {records.map((r, i) => {
+        {pageRecords.map((r, idx) => {
+          const i = page * PER_PAGE + idx;
           const key = r.txDigest ?? r.blobId;
           const v = verify[key] ?? { status: "idle" as VerifyStatus };
           return (
-            <li className="record" key={key} style={{ animationDelay: `${i * 40}ms` }}>
+            <li className="record" key={key} style={{ animationDelay: `${idx * 40}ms` }}>
               <div className="record-index tnum">{String(i + 1).padStart(2, "0")}</div>
               <div className="record-main">
                 <div className="record-top">
@@ -677,19 +699,27 @@ export function App() {
         })}
       </ul>
 
-      <AgentRun
-        records={records}
-        account={account?.address}
-        verifySign={verifySign}
-        perMoveCap={mandate?.perMoveCap ?? null}
-        canAnchor={youAreAgent}
-        connected={!!account}
-        agentAddress={account?.address}
-        mandateId={mandateId}
-        accessId={liveAccessId}
-        signAndExecute={runAnchor}
-        onAnchored={() => load(mandateId)}
-      />
+      {pageCount > 1 && (
+        <div className="pager">
+          <button
+            className="btn-ghost"
+            disabled={page === 0}
+            onClick={() => setRecordsPage(page - 1)}
+          >
+            Prev
+          </button>
+          <span className="pager-at">
+            page {page + 1} of {pageCount} · {records.length} records
+          </span>
+          <button
+            className="btn-ghost"
+            disabled={page >= pageCount - 1}
+            onClick={() => setRecordsPage(page + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
 
       <p className="foot-note reveal">
         Each record points at evidence sealed on Walrus. Only a reader the owner authorized can

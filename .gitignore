@@ -1,6 +1,7 @@
 # Internal planning and tooling, not for the public repo
 PLAN.md
 TESTING.md
+MAINNET.md
 .claude/
 .firecrawl/
 memory/
@@ -27,3 +28,4 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
+../logo-concepts

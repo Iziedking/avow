@@ -224,6 +224,7 @@ avow create-mandate --agent 0xAGENT --per-move 1000000 --daily 10000000
 ```
 
 It prints `AVOW_MANDATE_ID`, `AVOW_ACCESS_ID`, and an admin cap. Keep the cap safe; it is what
+
 lets you grant auditors later. Export the first two for the commands below:
 
 ```bash

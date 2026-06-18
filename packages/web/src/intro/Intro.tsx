@@ -12,6 +12,8 @@ const STEPS: { phase: Phase; at: number }[] = [
   { phase: "confirm", at: 13000 },
   { phase: "resolve", at: 16000 },
 ];
+// When the whole animation has settled, the Launch app button appears.
+const READY_MS = 17600;
 
 const HEX = "0123456789abcdef";
 function randHex(len: number): string {
@@ -48,6 +50,7 @@ function Globe() {
 
 export function Intro({ onDone }: { onDone: () => void }) {
   const [phase, setPhase] = useState<Phase>("gate");
+  const [ready, setReady] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [muted, setMuted] = useState(false);
   const [hex, setHex] = useState<string[]>([]);
@@ -99,7 +102,8 @@ export function Intro({ onDone }: { onDone: () => void }) {
         }, s.at),
       );
     }
-    // No auto-dismiss: the boot lands on a "Launch app" button the user clicks to enter.
+    // No auto-dismiss: once the whole animation has settled, reveal the Launch app button.
+    timers.current.push(window.setTimeout(() => setReady(true), READY_MS));
 
     const blip = window.setInterval(() => audio.blip(), 720);
     const hexInt = window.setInterval(() => setHex((h) => [...h.slice(-7), randHex(48)]), 110);
@@ -182,7 +186,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
             <div className="confirm glow">HASH MATCHES THE ANCHOR ✓</div>
           )}
 
-          {phase === "resolve" && (
+          {ready && (
             <button className="gate-btn launch-btn" onClick={finish}>
               Launch app ▸
             </button>
@@ -191,7 +195,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
 
         <div className="intro-controls">
           <button onClick={toggleMute}>{muted ? "unmute" : "mute"}</button>
-          {phase !== "gate" && <button onClick={skip}>skip</button>}
+          {phase !== "gate" && !ready && <button onClick={skip}>skip</button>}
         </div>
       </div>
     </div>

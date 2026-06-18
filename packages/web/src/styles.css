@@ -411,6 +411,11 @@ button {
   border-color: var(--green);
 }
 
+.help {
+  border-bottom: 1px dotted var(--text-faint);
+  cursor: help;
+}
+
 .records-intro {
   margin: 0 0 18px;
   max-width: 70ch;

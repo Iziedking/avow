@@ -377,10 +377,19 @@ export function App() {
           <WalletConnect />
         </div>
         <p className="lede">
-          AI agents move real money and ask you to trust the results. Avow makes them{" "}
-          <strong>show their work</strong>. Everything your agent does is saved, sealed so only
-          you and people you allow can read it, and proven on chain. So you see what it really
-          did, not just what it claims.
+          {mode === "verify" ? (
+            <>
+              The AI agent you use moves your money and asks you to trust it. Don't,{" "}
+              <strong>verify it</strong>. Plug it in below and see exactly what it did, why, and
+              that it stayed within your limits. Proven, not promised.
+            </>
+          ) : (
+            <>
+              Build agents whose every action is provable. With the Avow SDK your agent records
+              and seals each action it takes; <strong>set the rules, run it, and verify</strong>,
+              all testable right here.
+            </>
+          )}
         </p>
         <div className="mode-toggle" role="tablist">
           <button
@@ -402,6 +411,7 @@ export function App() {
         </div>
       </header>
 
+      {mode === "build" && (
       <section className={`how hud${started ? " play" : ""}`}>
         <div className="how-step">
           <span className="how-n">1</span>
@@ -431,6 +441,7 @@ export function App() {
           </div>
         </div>
       </section>
+      )}
 
       {mode === "build" && (
       <section className="setup">
@@ -534,7 +545,7 @@ export function App() {
               Your agents, the ones this wallet owns. Pick one to see and verify what it has done.
             </p>
             <div className="demo-agents">
-              {myMandates.map((m) => (
+              {myMandates.map((m, i) => (
                 <button
                   key={m}
                   className={`demo-pill${mandateId === m ? " is-on" : ""}`}
@@ -542,8 +553,9 @@ export function App() {
                     setInput("");
                     setMandateId(m);
                   }}
+                  title={`Agent id: ${m}`}
                 >
-                  Agent · {short(m, 6, 4)}
+                  Agent {i + 1}
                 </button>
               ))}
             </div>
@@ -551,9 +563,23 @@ export function App() {
         )}
 
         <p className="finder-hint">
-          {account && myMandates.length > 0
-            ? "Or try one of ours, or paste any agent's id."
-            : "Connect your wallet (top right) to see your own agents, or try one of ours below. Either way, you verify what the agent did, you never just trust it."}
+          {account && myMandates.length > 0 ? (
+            <>
+              Or try one of ours, or paste any{" "}
+              <span
+                className="help"
+                title="An agent id is its mandate id: the on-chain rulebook and identity Avow gave the agent when it was registered. Every action it records is tied to this id, so pasting it loads that agent's full, provable history."
+              >
+                agent id
+              </span>
+              .
+            </>
+          ) : (
+            <>
+              Connect your wallet (top right) to see your own agents, or try one of ours below.
+              Either way, you verify what the agent did, you never just trust it.
+            </>
+          )}
         </p>
         <div className="demo-agents">
           {DEMO_AGENTS.map((a) => (

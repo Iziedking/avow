@@ -490,6 +490,12 @@ input:focus {
   color: var(--text-faint);
 }
 
+.setup-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* Summary, a ledger header */
 .summary {
   display: grid;
@@ -1574,7 +1580,19 @@ body::before {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
+  scroll-behavior: smooth;
   padding: 28px 36px 48px;
+}
+
+/* The three sections flow as one continuous scroll, divided by a hairline. */
+.doc-section {
+  scroll-margin-top: 8px;
+}
+
+.doc-section + .doc-section {
+  margin-top: 44px;
+  padding-top: 40px;
+  border-top: 1px solid var(--line);
 }
 
 .doc-article {

@@ -424,14 +424,23 @@ export function App() {
                     <em className="field-hint">The most it can move per day, added up.</em>
                   </label>
                 </div>
-                <button
-                  className="btn-green"
-                  onClick={onSetup}
-                  disabled={setupState.status === "running"}
-                  style={{ padding: "10px 18px" }}
-                >
-                  {setupState.status === "running" ? "creating…" : "Create mandate"}
-                </button>
+                <div className="setup-actions">
+                  <button
+                    className="btn-green"
+                    onClick={onSetup}
+                    disabled={setupState.status === "running"}
+                    style={{ padding: "10px 18px" }}
+                  >
+                    {setupState.status === "running" ? "creating…" : "Create mandate"}
+                  </button>
+                  <button
+                    className="btn-ghost"
+                    onClick={() => setSetupOpen(false)}
+                    disabled={setupState.status === "running"}
+                  >
+                    Cancel
+                  </button>
+                </div>
                 {setupState.status === "ok" && setupState.result && (
                   <div className="verify-result ok">
                     <strong>Created and loaded below.</strong> mandate{" "}
@@ -448,19 +457,6 @@ export function App() {
           </>
         )}
       </section>
-
-      <AgentRun
-        records={records}
-        account={account?.address}
-        verifySign={verifySign}
-        canAnchor={youAreAgent}
-        connected={!!account}
-        agentAddress={account?.address}
-        mandateId={mandateId}
-        accessId={liveAccessId}
-        signAndExecute={runAnchor}
-        onAnchored={() => load(mandateId)}
-      />
 
       <section className="finder">
         <label className="label" htmlFor="mandate">
@@ -652,6 +648,19 @@ export function App() {
           );
         })}
       </ul>
+
+      <AgentRun
+        records={records}
+        account={account?.address}
+        verifySign={verifySign}
+        canAnchor={youAreAgent}
+        connected={!!account}
+        agentAddress={account?.address}
+        mandateId={mandateId}
+        accessId={liveAccessId}
+        signAndExecute={runAnchor}
+        onAnchored={() => load(mandateId)}
+      />
 
       <p className="foot-note reveal">
         Each record points at evidence sealed on Walrus. Only a reader the owner authorized can

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
 type Section = "overview" | "sdk" | "cli";
@@ -57,7 +57,8 @@ function DocMark() {
 }
 
 export function Docs({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const [section, setSection] = useState<Section>("overview");
+  const [active, setActive] = useState<Section>("overview");
+  const mainRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -72,6 +73,31 @@ export function Docs({ open, onClose }: { open: boolean; onClose: () => void }) 
       document.body.style.overflow = prev;
     };
   }, [open, onClose]);
+
+  // Scroll spy: highlight whichever section has reached the top of the scroll area.
+  useEffect(() => {
+    if (!open) return;
+    const root = mainRef.current;
+    if (!root) return;
+    const onScroll = () => {
+      const rootTop = root.getBoundingClientRect().top;
+      let current: Section = SECTIONS[0].id;
+      for (const s of SECTIONS) {
+        const el = root.querySelector<HTMLElement>(`#doc-${s.id}`);
+        if (el && el.getBoundingClientRect().top - rootTop <= 140) current = s.id;
+      }
+      setActive(current);
+    };
+    onScroll();
+    root.addEventListener("scroll", onScroll, { passive: true });
+    return () => root.removeEventListener("scroll", onScroll);
+  }, [open]);
+
+  const goTo = (id: Section) => {
+    mainRef.current
+      ?.querySelector<HTMLElement>(`#doc-${id}`)
+      ?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   if (!open) return null;
 
@@ -102,8 +128,8 @@ export function Docs({ open, onClose }: { open: boolean; onClose: () => void }) 
             {SECTIONS.map((s) => (
               <button
                 key={s.id}
-                className={`doc-nav-btn${section === s.id ? " is-on" : ""}`}
-                onClick={() => setSection(s.id)}
+                className={`doc-nav-btn${active === s.id ? " is-on" : ""}`}
+                onClick={() => goTo(s.id)}
               >
                 {s.label}
               </button>
@@ -118,10 +144,16 @@ export function Docs({ open, onClose }: { open: boolean; onClose: () => void }) 
             </a>
           </nav>
 
-          <main className="doc-main">
-            {section === "overview" && <Overview onJump={setSection} />}
-            {section === "sdk" && <Sdk />}
-            {section === "cli" && <Cli />}
+          <main className="doc-main" ref={mainRef}>
+            <div id="doc-overview" className="doc-section">
+              <Overview onJump={goTo} />
+            </div>
+            <div id="doc-sdk" className="doc-section">
+              <Sdk />
+            </div>
+            <div id="doc-cli" className="doc-section">
+              <Cli />
+            </div>
           </main>
         </div>
       </div>

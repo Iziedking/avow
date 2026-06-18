@@ -149,14 +149,14 @@ export function AgentRun(props: AgentRunProps) {
     <section className="run hud">
       <div className="run-bar">
         <div>
-          <span className="run-title">See a proof for real</span>
+          <span className="run-title">See a proof</span>
           <p className="run-sub">
             Verify the latest proof and watch it get unsealed, live. The reasoning is sealed, only
             you or an auditor you allow can read it. Nothing here is a mockup.
           </p>
         </div>
         <button className="btn-green run-btn" onClick={verifyLatest} disabled={!canVerify}>
-          {busy ? "working…" : "Verify the latest proof"}
+          {busy ? "working…" : lines.length ? "Verify again" : "Verify the latest proof"}
         </button>
       </div>
 

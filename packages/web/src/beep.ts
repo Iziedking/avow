@@ -3,6 +3,11 @@
 // until a user gesture, so we resume on the first interaction as well.
 
 let ctx: AudioContext | null = null;
+let muted = false;
+
+export function setBeepMuted(m: boolean): void {
+  muted = m;
+}
 
 function ensure(): AudioContext | null {
   try {
@@ -28,6 +33,7 @@ if (typeof window !== "undefined") {
 
 // One short electronic blip. Frequency rises per step so it reads like a line being spoken.
 export function beep(freq = 880): void {
+  if (muted) return;
   const c = ensure();
   if (!c) return;
   const osc = c.createOscillator();

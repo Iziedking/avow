@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useCurrentAccount,
   useSignPersonalMessage,
@@ -22,7 +22,7 @@ import { describeObserved } from "./reveal";
 import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
 import type { SignAndExecute } from "./anchorLive";
-import { beep } from "./beep";
+import { beep, setBeepMuted } from "./beep";
 import { DEMO_MANDATE_ID, DEMO_AGENTS, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
 type VerifyStatus = "idle" | "running" | "ok" | "fail";
@@ -111,6 +111,41 @@ export function App() {
       return "verify";
     }
   });
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [soundMuted, setSoundMuted] = useState(() => {
+    try {
+      return localStorage.getItem("avow-muted") === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    setBeepMuted(soundMuted);
+    try {
+      localStorage.setItem("avow-muted", soundMuted ? "1" : "0");
+    } catch {
+      /* storage unavailable */
+    }
+  }, [soundMuted]);
+
+  const settingsRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (settingsRef.current && !settingsRef.current.contains(e.target as Node)) {
+        setSettingsOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setSettingsOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDoc);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [settingsOpen]);
   const [auditor, setAuditor] = useState("");
   const [grant, setGrant] = useState<{ status: "idle" | "running" | "ok" | "fail"; msg?: string }>(
     { status: "idle" },
@@ -374,7 +409,52 @@ export function App() {
               <span className="brand-line">proof, not trust</span>
             </div>
           </div>
-          <WalletConnect />
+          <div className="masthead-actions">
+            <div className="settings" ref={settingsRef}>
+              <button
+                className="settings-btn"
+                onClick={() => setSettingsOpen((o) => !o)}
+                aria-label="Settings"
+                aria-expanded={settingsOpen}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" aria-hidden="true">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+              {settingsOpen && (
+                <div className="settings-card">
+                  <span className="settings-title">Settings</span>
+                  <label className="settings-row">
+                    <span>
+                      Developer mode
+                      <em>register agents, simulate, grant access</em>
+                    </span>
+                    <span className="switch">
+                      <input
+                        type="checkbox"
+                        checked={mode === "build"}
+                        onChange={(e) => setMode(e.target.checked ? "build" : "verify")}
+                      />
+                      <span className="switch-track" />
+                    </span>
+                  </label>
+                  <label className="settings-row">
+                    <span>Mute sound</span>
+                    <span className="switch">
+                      <input
+                        type="checkbox"
+                        checked={soundMuted}
+                        onChange={(e) => setSoundMuted(e.target.checked)}
+                      />
+                      <span className="switch-track" />
+                    </span>
+                  </label>
+                </div>
+              )}
+            </div>
+            <WalletConnect />
+          </div>
         </div>
         <p className="lede">
           {mode === "verify" ? (
@@ -391,24 +471,9 @@ export function App() {
             </>
           )}
         </p>
-        <div className="mode-toggle" role="tablist">
-          <button
-            role="tab"
-            aria-selected={mode === "verify"}
-            className={`mode-tab${mode === "verify" ? " is-on" : ""}`}
-            onClick={() => setMode("verify")}
-          >
-            Verify an agent
-          </button>
-          <button
-            role="tab"
-            aria-selected={mode === "build"}
-            className={`mode-tab${mode === "build" ? " is-on" : ""}`}
-            onClick={() => setMode("build")}
-          >
-            Build with the SDK
-          </button>
-        </div>
+        {mode === "build" && (
+          <span className="mode-flag">developer mode on</span>
+        )}
       </header>
 
       {mode === "build" && (

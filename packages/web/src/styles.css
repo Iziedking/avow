@@ -507,6 +507,36 @@ button {
   cursor: help;
 }
 
+.demo-line {
+  margin-top: 14px;
+}
+
+.demo-toggle {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--green-dim);
+  cursor: pointer;
+}
+
+.demo-toggle:hover {
+  color: var(--green);
+}
+
+/* Shown when no agent is selected yet, so nothing auto-loads. */
+.pick-prompt {
+  margin: 36px 0 56px;
+  padding: 30px 26px;
+  max-width: 60ch;
+  background: var(--ink-850);
+  border: 1px solid var(--line);
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
 .records-intro {
   margin: 0 0 18px;
   max-width: 70ch;

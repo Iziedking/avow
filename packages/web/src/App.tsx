@@ -23,7 +23,7 @@ import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
 import type { SignAndExecute } from "./anchorLive";
 import { beep, setBeepMuted } from "./beep";
-import { DEMO_MANDATE_ID, DEMO_AGENTS, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
+import { DEMO_AGENTS, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
 type VerifyStatus = "idle" | "running" | "ok" | "fail";
 interface VerifyState {
@@ -90,8 +90,9 @@ function Mark() {
 }
 
 export function App() {
-  const [mandateId, setMandateId] = useState(DEMO_MANDATE_ID);
+  const [mandateId, setMandateId] = useState("");
   const [input, setInput] = useState("");
+  const [showDemos, setShowDemos] = useState(false);
   const [records, setRecords] = useState<AnchoredRecord[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "error">("idle");
   const [error, setError] = useState("");
@@ -208,10 +209,15 @@ export function App() {
   const { mutateAsync: signAndExecute } = useSignAndExecuteTransaction();
 
   const load = useCallback(async (id: string) => {
-    setStatus("loading");
     setError("");
     setVerify({});
     setRecordsPage(0);
+    if (!id.trim()) {
+      setRecords([]);
+      setStatus("idle");
+      return;
+    }
+    setStatus("loading");
     try {
       setRecords(await fetchRecords(id.trim()));
       setStatus("idle");
@@ -513,8 +519,8 @@ export function App() {
         <span className="label">Register an agent</span>
         {!account ? (
           <p className="finder-hint">
-            Connect your wallet (top right) to register an agent. You become the owner, and you
-            can leave the agent address blank to use this same wallet as the agent.
+            Connect your wallet to register an agent. You become the owner, and you can leave the
+            agent address blank to use this same wallet as the agent.
           </p>
         ) : (
           <>
@@ -630,37 +636,28 @@ export function App() {
         <p className="finder-hint">
           {account && myMandates.length > 0 ? (
             <>
-              Or try one of ours, or paste any{" "}
+              Or paste any{" "}
+              <span
+                className="help"
+                title="An agent id is its mandate id: the on-chain rulebook and identity Avow gave the agent when it was registered. Every action it records is tied to this id, so pasting it loads that agent's full, provable history."
+              >
+                agent id
+              </span>{" "}
+              to inspect another.
+            </>
+          ) : (
+            <>
+              Connect your wallet to see your own agents, or paste any{" "}
               <span
                 className="help"
                 title="An agent id is its mandate id: the on-chain rulebook and identity Avow gave the agent when it was registered. Every action it records is tied to this id, so pasting it loads that agent's full, provable history."
               >
                 agent id
               </span>
-              .
-            </>
-          ) : (
-            <>
-              Connect your wallet (top right) to see your own agents, or try one of ours below.
-              Either way, you verify what the agent did, you never just trust it.
+              . You verify what the agent did, you never just trust it.
             </>
           )}
         </p>
-        <div className="demo-agents">
-          {DEMO_AGENTS.map((a) => (
-            <button
-              key={a.mandateId}
-              className={`demo-pill${mandateId === a.mandateId ? " is-on" : ""}`}
-              onClick={() => {
-                setInput("");
-                setMandateId(a.mandateId);
-              }}
-              title={a.blurb}
-            >
-              {a.name}
-            </button>
-          ))}
-        </div>
         <div className="finder-row">
           <input
             id="mandate"
@@ -675,6 +672,29 @@ export function App() {
           <button className="btn" onClick={() => input.trim() && setMandateId(input.trim())}>
             Load
           </button>
+        </div>
+        <div className="demo-line">
+          {showDemos ? (
+            <div className="demo-agents">
+              {DEMO_AGENTS.map((a) => (
+                <button
+                  key={a.mandateId}
+                  className={`demo-pill${mandateId === a.mandateId ? " is-on" : ""}`}
+                  onClick={() => {
+                    setInput("");
+                    setMandateId(a.mandateId);
+                  }}
+                  title={a.blurb}
+                >
+                  {a.name}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <button className="demo-toggle" onClick={() => setShowDemos(true)}>
+              Or try one of our demo agents
+            </button>
+          )}
         </div>
       </section>
 
@@ -704,6 +724,15 @@ export function App() {
         </section>
       )}
 
+      {!mandateId && (
+        <p className="pick-prompt">
+          Pick an agent to inspect. Connect your wallet to see your own, or try one of our demo
+          agents above. Then verify every action it took.
+        </p>
+      )}
+
+      {mandateId && (
+      <>
       <section className="summary hud">
         <div className="stat">
           <span className="stat-num">{moves}</span>
@@ -912,6 +941,8 @@ export function App() {
             Next
           </button>
         </div>
+      )}
+      </>
       )}
 
       <p className="foot-note reveal">

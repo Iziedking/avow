@@ -1863,6 +1863,15 @@ body::before {
   color: var(--text-faint);
 }
 
+.run-note {
+  margin: 16px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: var(--text-faint);
+}
+
 @media (max-width: 560px) {
   .run-bar {
     flex-direction: column;

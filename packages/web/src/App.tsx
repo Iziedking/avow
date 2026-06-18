@@ -364,6 +364,7 @@ export function App() {
 
       <AgentRun
         canAnchor={youAreAgent}
+        connected={!!account}
         agentAddress={account?.address}
         mandateId={mandateId}
         accessId={liveAccessId}

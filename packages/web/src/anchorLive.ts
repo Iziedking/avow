@@ -118,7 +118,7 @@ export async function anchorLive(opts: {
   step("encoding the blob…");
   await flow.encode();
 
-  step("registering storage on Walrus — approve in your wallet…");
+  step("registering storage on Walrus, approve in your wallet…");
   const register = await signAndExecute({
     transaction: flow.register({ epochs: WALRUS_EPOCHS, owner: address, deletable: false }),
   });
@@ -126,13 +126,13 @@ export async function anchorLive(opts: {
   step("uploading to Walrus…");
   await flow.upload({ digest: register.digest });
 
-  step("certifying the blob — approve in your wallet…");
+  step("certifying the blob, approve in your wallet…");
   await signAndExecute({ transaction: flow.certify() });
 
   const { blobId } = await flow.getBlob();
 
   // 4. Anchor on chain. The mandate check runs here; an out-of-bounds action would be rejected.
-  step("anchoring the proof on chain — approve in your wallet…");
+  step("anchoring the proof on chain, approve in your wallet…");
   const tx = new Transaction();
   tx.moveCall({
     target: `${PACKAGE_ID}::record::anchor`,

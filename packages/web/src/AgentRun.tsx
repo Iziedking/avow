@@ -1,7 +1,7 @@
 // Watch the agent work, then anchor one real proof. The playback narrates the reference yield
-// agent's real decision logic over six cycles (front-end only, so it never stalls in a demo).
-// When the connected wallet is the agent of the loaded mandate, the finale creates one genuine
-// proof on the spot, signed by that wallet, and it appears in the track record below.
+// agent's real decision logic over six cycles (front-end only, an example of what it does, so it
+// never stalls in a demo). When the connected wallet is the agent of the loaded mandate, the
+// finale creates one genuine proof on the spot, signed by that wallet, and it appears below.
 
 import { useCallback, useRef, useState } from "react";
 import { beep } from "./beep";
@@ -30,9 +30,22 @@ interface Line {
   kind: LineKind;
 }
 
+// Each kind of line reads out at its own pitch, so the console chatters as it loads.
+const KIND_HZ: Record<LineKind, number> = {
+  head: 600,
+  data: 720,
+  think: 520,
+  move: 880,
+  hold: 440,
+  proof: 800,
+  done: 990,
+};
+
 export interface AgentRunProps {
   /** True when the connected wallet is the agent named in the loaded mandate. */
   canAnchor: boolean;
+  /** True when any wallet is connected. */
+  connected: boolean;
   agentAddress?: string;
   mandateId: string;
   accessId: string | null;
@@ -50,7 +63,10 @@ export function AgentRun(props: AgentRunProps) {
   const [anchoring, setAnchoring] = useState(false);
   const runId = useRef(0);
 
-  const push = useCallback((line: Line) => setLines((ls) => [...ls, line]), []);
+  const push = useCallback((line: Line) => {
+    setLines((ls) => [...ls, line]);
+    beep(KIND_HZ[line.kind]);
+  }, []);
 
   const run = useCallback(async () => {
     const id = ++runId.current;
@@ -60,7 +76,9 @@ export function AgentRun(props: AgentRunProps) {
     const alive = () => runId.current === id;
     const wait = (ms: number) => new Promise((r) => window.setTimeout(r, ms));
     const add = (line: Line) => {
-      if (alive()) setLines((ls) => [...ls, line]);
+      if (!alive()) return;
+      setLines((ls) => [...ls, line]);
+      beep(KIND_HZ[line.kind]);
     };
 
     let current = "idle";
@@ -70,7 +88,6 @@ export function AgentRun(props: AgentRunProps) {
     for (let i = 0; i < SCENARIO.length && alive(); i++) {
       const c = SCENARIO[i];
       add({ text: `cycle ${String(i + 1).padStart(2, "0")}`, kind: "head" });
-      beep(620);
       await wait(700);
 
       add({ text: `reading yields from each protocol…`, kind: "think" });
@@ -88,21 +105,18 @@ export function AgentRun(props: AgentRunProps) {
 
       const gain = bestApy - currentApy;
       if (best === current) {
-        add({ text: `HOLD — already in the best yield, nothing to do`, kind: "hold" });
-        beep(430);
+        add({ text: `HOLD: already in the best yield, nothing to do`, kind: "hold" });
       } else if (gain < THRESHOLD) {
         add({
-          text: `HOLD — moving would only gain ${gain}bps, under the ${THRESHOLD}bps rule, not worth it`,
+          text: `HOLD: only a ${gain}bps gain, under the ${THRESHOLD}bps rule, not worth it`,
           kind: "hold",
         });
-        beep(430);
       } else {
         moves += 1;
         add({
-          text: `MOVE ${current} → ${best} — a ${gain}bps gain, clears the ${THRESHOLD}bps rule`,
+          text: `MOVE ${current} → ${best}: a ${gain}bps gain, clears the ${THRESHOLD}bps rule`,
           kind: "move",
         });
-        beep(880);
         await wait(650);
         add({ text: `sealing the evidence · storing on Walrus · proof on chain ✓`, kind: "proof" });
         current = best;
@@ -116,7 +130,6 @@ export function AgentRun(props: AgentRunProps) {
         text: `done. ${moves} moves, each sealed and proven. open any in the track record below and verify it yourself.`,
         kind: "done",
       });
-      beep(990);
       setRunning(false);
     }
   }, []);
@@ -151,7 +164,6 @@ export function AgentRun(props: AgentRunProps) {
       });
       push({ text: `proof anchored ✓  ${SUISCAN}/tx/${result.anchorDigest}`, kind: "proof" });
       push({ text: `it's in the track record below now. open it and verify.`, kind: "done" });
-      beep(990);
       props.onAnchored();
     } catch (e) {
       push({
@@ -169,8 +181,8 @@ export function AgentRun(props: AgentRunProps) {
         <div>
           <span className="run-title">Watch the agent work</span>
           <p className="run-sub">
-            See how it reads the yields, compares them, and decides, the same run that produced
-            the proofs below.
+            An example of how it reads the yields, compares them, and decides, the same run that
+            produced the proofs below.
           </p>
         </div>
         <button className="btn-green run-btn" onClick={run} disabled={running || anchoring}>
@@ -192,7 +204,7 @@ export function AgentRun(props: AgentRunProps) {
         {(running || anchoring) && <span className="run-cursor" />}
       </div>
 
-      {props.canAnchor && (
+      {props.canAnchor ? (
         <div className="run-finale">
           <button className="btn-green" onClick={anchorOne} disabled={anchoring || running}>
             {anchoring ? "anchoring…" : "Create a real proof, live"}
@@ -203,7 +215,13 @@ export function AgentRun(props: AgentRunProps) {
             appears below.
           </span>
         </div>
-      )}
+      ) : props.connected ? (
+        <p className="run-note">
+          This mandate's agent is a different wallet, so its actions are recorded by the agent's
+          own code through the SDK or CLI. Connected here you are the owner or an auditor: you
+          view and verify. To create a live proof yourself, register an agent with this wallet.
+        </p>
+      ) : null}
     </section>
   );
 }

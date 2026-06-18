@@ -33,6 +33,8 @@ export interface AgentRunProps {
   records: AnchoredRecord[];
   account?: string;
   verifySign: SignPersonalMessage;
+  /** The mandate's per-action limit, to show the rule check. */
+  perMoveCap?: string | null;
   /** True when the connected wallet is the agent named in the loaded mandate. */
   canAnchor: boolean;
   connected: boolean;
@@ -41,6 +43,10 @@ export interface AgentRunProps {
   accessId: string | null;
   signAndExecute: SignAndExecute;
   onAnchored: () => void;
+}
+
+function fmt(n: string): string {
+  return /^\d+$/.test(n) ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : n;
 }
 
 export function AgentRun(props: AgentRunProps) {
@@ -75,13 +81,20 @@ export function AgentRun(props: AgentRunProps) {
       );
       if (!alive()) return;
       if (out.hashMatches) {
-        add({ text: `fingerprint matches the on-chain anchor ✓`, kind: "proof" });
-        add({ text: `unsealed. this is what the agent actually recorded:`, kind: "head" });
+        add({ text: `verified. this action obeyed your rules.`, kind: "head" });
+        add({ text: `unaltered   the evidence matches the fingerprint on chain`, kind: "proof" });
+        if (props.perMoveCap) {
+          const within = BigInt(latest.amount || "0") <= BigInt(props.perMoveCap);
+          add({
+            text: `within limit   moved ${fmt(latest.amount)}, limit ${fmt(props.perMoveCap)} per action ${within ? "✓" : "over"}`,
+            kind: within ? "data" : "hold",
+          });
+        }
+        add({ text: `unsealed, this is what the agent actually recorded:`, kind: "head" });
         for (const line of describeObserved(out.bundle?.observed)) {
           add({ text: `saw   ${line}`, kind: "data" });
         }
         if (out.rationale) add({ text: `why   ${out.rationale}`, kind: "move" });
-        add({ text: `real, sealed, attributable, unaltered. no trust needed.`, kind: "done" });
       } else {
         add({
           text: `the recomputed fingerprint did not match. this record does not verify.`,
@@ -112,11 +125,14 @@ export function AgentRun(props: AgentRunProps) {
       actionType: "yield_move",
       target: "navi",
       amount: "100000",
-      rationale: "Live proof from the dashboard: moved to navi, the best yield this cycle.",
+      rationale:
+        "Ignored degenpool (9.20% APY, risk 320bps) for exceeding the 150bps risk limit. " +
+        "Moved to navi: a risk-adjusted 5.05% (5.30% APY minus 25bps risk) is the best safe yield.",
       observed: {
         rates: [
-          { target: "navi", apyBps: 530 },
-          { target: "scallop", apyBps: 415 },
+          { target: "navi", apyBps: 530, riskBps: 25 },
+          { target: "scallop", apyBps: 415, riskBps: 60 },
+          { target: "degenpool", apyBps: 920, riskBps: 320 },
         ],
       },
     };
@@ -151,8 +167,8 @@ export function AgentRun(props: AgentRunProps) {
         <div>
           <span className="run-title">See a proof</span>
           <p className="run-sub">
-            Verify the latest proof and watch it get unsealed, live. The reasoning is sealed, only
-            you or an auditor you allow can read it. Nothing here is a mockup.
+            This verifies the most recent proof and unseals its reasoning, live. To verify a
+            specific one, use the Verify button on any record in the track record above.
           </p>
         </div>
         <button className="btn-green run-btn" onClick={verifyLatest} disabled={!canVerify}>

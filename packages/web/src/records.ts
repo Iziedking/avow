@@ -67,6 +67,30 @@ export async function fetchRecords(mandateId: string): Promise<AnchoredRecord[]>
   return records.filter((r) => r.mandateId === mandateId);
 }
 
+export interface MandateInfo {
+  agent: string;
+  perMoveCap: string;
+  dailyCap: string;
+}
+
+// The mandate's rules: who its agent is, and the limits every action is checked against.
+export async function fetchMandate(mandateId: string): Promise<MandateInfo | null> {
+  const client = suiClient();
+  try {
+    const res = await client.getObject({ id: mandateId, options: { showContent: true } });
+    const content = res.data?.content;
+    if (!content || content.dataType !== "moveObject") return null;
+    const f = (content as { fields: Record<string, unknown> }).fields;
+    return {
+      agent: String(f.agent),
+      perMoveCap: String(f.per_move_cap),
+      dailyCap: String(f.daily_cap),
+    };
+  } catch {
+    return null;
+  }
+}
+
 // The single evidence access registered for a mandate, found from its AccessCreated event.
 export async function fetchAccessId(mandateId: string): Promise<string | null> {
   const client = suiClient();

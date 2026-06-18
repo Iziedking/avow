@@ -7,7 +7,13 @@ import {
 import { WalletConnect } from "./WalletConnect";
 import { Docs } from "./Docs";
 import { Transaction } from "@mysten/sui/transactions";
-import { fetchRecords, fetchAccessId, type AnchoredRecord } from "./records";
+import {
+  fetchRecords,
+  fetchAccessId,
+  fetchMandate,
+  type AnchoredRecord,
+  type MandateInfo,
+} from "./records";
 import { findCapForMandate } from "./caps";
 import { setupMandate } from "./setup";
 import { verifyRecord, type SignPersonalMessage } from "./verify";
@@ -91,6 +97,7 @@ export function App() {
 
   const [capId, setCapId] = useState<string | null>(null);
   const [accessId, setAccessId] = useState<string | null>(null);
+  const [mandate, setMandate] = useState<MandateInfo | null>(null);
   const [auditor, setAuditor] = useState("");
   const [grant, setGrant] = useState<{ status: "idle" | "running" | "ok" | "fail"; msg?: string }>(
     { status: "idle" },
@@ -201,10 +208,13 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
     setCapId(null);
+    setMandate(null);
     setGrant({ status: "idle" });
     (async () => {
       const acc = await fetchAccessId(mandateId).catch(() => null);
       if (!cancelled) setAccessId(acc);
+      const info = await fetchMandate(mandateId).catch(() => null);
+      if (!cancelled) setMandate(info);
       if (account) {
         const cap = await findCapForMandate(account.address, mandateId).catch(() => null);
         if (!cancelled) setCapId(cap);
@@ -291,8 +301,7 @@ export function App() {
   // The live-anchor finale runs only when the connected wallet is the agent of this mandate.
   const youAreAgent =
     !!account &&
-    (liveTarget?.mandateId === mandateId ||
-      (records.length > 0 && records[0].agent === account.address));
+    (mandate?.agent === account.address || liveTarget?.mandateId === mandateId);
   const liveAccessId = liveTarget?.mandateId === mandateId ? liveTarget.accessId : accessId;
   const runAnchor: SignAndExecute = async ({ transaction }) => {
     const res = await signAndExecute({ transaction });
@@ -618,8 +627,27 @@ export function App() {
 
                 {v.status === "ok" && (
                   <div className="verify-result ok">
-                    <strong>Verified.</strong> The evidence is unaltered and the action stayed
-                    within the rules. This is what the agent sealed, now unsealed for you:
+                    <strong>Verified. This action obeyed your rules.</strong>
+                    <div className="reveal-block">
+                      <span className="reveal-k">unaltered</span>
+                      <p className="reveal-why">
+                        the sealed evidence matches the fingerprint stamped on chain, nothing was
+                        changed after the fact.
+                      </p>
+                    </div>
+                    {mandate && (
+                      <div className="reveal-block">
+                        <span className="reveal-k">within the limit</span>
+                        <p className="reveal-why">
+                          it moved {group(r.amount)}; the limit is {group(mandate.perMoveCap)} per
+                          action.{" "}
+                          {BigInt(r.amount || "0") <= BigInt(mandate.perMoveCap)
+                            ? "Inside the limit ✓"
+                            : "over the limit"}
+                          . An over-limit action could not have produced this proof at all.
+                        </p>
+                      </div>
+                    )}
                     {describeObserved(v.observed).length > 0 && (
                       <div className="reveal-block">
                         <span className="reveal-k">what it saw</span>
@@ -653,6 +681,7 @@ export function App() {
         records={records}
         account={account?.address}
         verifySign={verifySign}
+        perMoveCap={mandate?.perMoveCap ?? null}
         canAnchor={youAreAgent}
         connected={!!account}
         agentAddress={account?.address}

@@ -5,7 +5,7 @@
 
 import { fromBase64, toHex } from "@mysten/sui/utils";
 import type { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
-import { PACKAGE_ID } from "./config";
+import { ORIGINAL_PACKAGE_ID } from "./config";
 import type { AnchoredRecord } from "./types";
 
 // A Move vector<u8> comes back from the RPC as a byte array or a base64 string. Handle both.
@@ -25,7 +25,7 @@ export async function listRecords(
   limit = 50,
 ): Promise<AnchoredRecord[]> {
   const res = await suiClient.queryEvents({
-    query: { MoveEventType: `${PACKAGE_ID}::record::ActionAnchored` },
+    query: { MoveEventType: `${ORIGINAL_PACKAGE_ID}::record::ActionAnchored` },
     order: "descending",
     limit,
   });

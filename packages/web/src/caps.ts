@@ -4,7 +4,7 @@
 // MandateCap objects for the one whose mandate_id matches, and use it to gate the owner panel.
 
 import { suiClient } from "./records";
-import { PACKAGE_ID } from "./config";
+import { ORIGINAL_PACKAGE_ID } from "./config";
 
 export async function findCapForMandate(
   address: string,
@@ -13,7 +13,7 @@ export async function findCapForMandate(
   const client = suiClient();
   const res = await client.getOwnedObjects({
     owner: address,
-    filter: { StructType: `${PACKAGE_ID}::mandate::MandateCap` },
+    filter: { StructType: `${ORIGINAL_PACKAGE_ID}::mandate::MandateCap` },
     options: { showContent: true },
   });
   for (const o of res.data) {

@@ -2,11 +2,7 @@
 name = "avow"
 edition = "2024"
 
-# Recent Sui toolchains inject the Sui framework and the Move standard library as
-# implicit system dependencies, so no explicit [dependencies] block is required here.
-# If `sui move build` cannot resolve `sui::...` or `std::...`, generate a fresh scaffold
-# with `sui move new avow`, copy its generated [dependencies] block here, and drop these
-# sources into `sources/`.
-
-[addresses]
-avow = "0x0"
+# The Sui framework and standard library are implicit system dependencies, so no [dependencies]
+# block is required. testnet and mainnet are built-in system environments on this toolchain, so
+# no [environments] block is needed (and declaring them errors). The package's own named address
+# (avow) binds automatically from the package name, so no [addresses] section is needed either.

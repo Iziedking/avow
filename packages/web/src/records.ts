@@ -7,7 +7,7 @@
 
 import { SuiJsonRpcClient, getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { fromBase64, toHex } from "@mysten/sui/utils";
-import { NETWORK, PACKAGE_ID } from "./config";
+import { NETWORK, ORIGINAL_PACKAGE_ID } from "./config";
 
 export interface AnchoredRecord {
   mandateId: string;
@@ -66,7 +66,7 @@ export async function fetchRecords(mandateId: string): Promise<AnchoredRecord[]>
 
   for (let page = 0; page < 8; page++) {
     const res = await client.queryEvents({
-      query: { MoveEventType: `${PACKAGE_ID}::record::ActionAnchored` },
+      query: { MoveEventType: `${ORIGINAL_PACKAGE_ID}::record::ActionAnchored` },
       order: "descending",
       limit: 50,
       cursor,
@@ -113,7 +113,7 @@ export async function fetchMyMandates(owner: string): Promise<string[]> {
   try {
     const res = await client.getOwnedObjects({
       owner,
-      filter: { StructType: `${PACKAGE_ID}::mandate::MandateCap` },
+      filter: { StructType: `${ORIGINAL_PACKAGE_ID}::mandate::MandateCap` },
       options: { showContent: true },
     });
     const ids: string[] = [];
@@ -134,7 +134,7 @@ export async function fetchMyMandates(owner: string): Promise<string[]> {
 export async function fetchAccessId(mandateId: string): Promise<string | null> {
   const client = suiClient();
   const res = await client.queryEvents({
-    query: { MoveEventType: `${PACKAGE_ID}::record::AccessCreated` },
+    query: { MoveEventType: `${ORIGINAL_PACKAGE_ID}::record::AccessCreated` },
     order: "descending",
     limit: 50,
   });

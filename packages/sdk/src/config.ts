@@ -20,6 +20,12 @@ export const PACKAGE_ID =
   env("AVOW_PACKAGE_ID") ??
   "0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e";
 
+// After a package upgrade, struct and event TYPES stay anchored to the package id that first
+// defined them, so type/event queries (MoveEventType, owned-object StructType filters) must use
+// this original id while moveCalls use the latest PACKAGE_ID. Identical on first publish; set
+// once and never change across upgrades. Override with AVOW_ORIGINAL_PACKAGE_ID if needed.
+export const ORIGINAL_PACKAGE_ID = env("AVOW_ORIGINAL_PACKAGE_ID") ?? PACKAGE_ID;
+
 // Seal open-mode key servers run by Mysten on testnet. Open mode lets any package request
 // keys, which is what we want while building. Source: seal-docs.wal.app Pricing, verified
 // key servers. Threshold 2 means both servers must return a share to decrypt.

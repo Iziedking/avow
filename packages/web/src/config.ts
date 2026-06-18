@@ -6,6 +6,15 @@ export const NETWORK = "testnet" as const;
 export const PACKAGE_ID =
   "0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e";
 
+// After a package upgrade, struct and event TYPES stay anchored to the package id that first
+// defined them. So type/event QUERIES (owned-object StructType filters, MoveEventType queries)
+// must use this original id, while moveCalls use the latest PACKAGE_ID above. On first publish
+// they are identical; set this once and never change it across upgrades.
+// NOTE: Seal's encryption namespace is also anchored to the package id used at encrypt time.
+// Before the first mainnet upgrade, revisit the Seal packageId in verify.ts/anchorLive.ts
+// against the Seal upgrade docs (it likely needs to pin to this original id too).
+export const ORIGINAL_PACKAGE_ID = PACKAGE_ID;
+
 // Two reference agents to inspect, both live on testnet with every decision recorded and
 // independently verified. The consumer bill payer is shown first.
 export interface DemoAgent {

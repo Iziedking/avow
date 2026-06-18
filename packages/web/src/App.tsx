@@ -11,6 +11,7 @@ import {
   fetchRecords,
   fetchAccessId,
   fetchMandate,
+  fetchMyMandates,
   type AnchoredRecord,
   type MandateInfo,
 } from "./records";
@@ -100,6 +101,16 @@ export function App() {
   const [accessId, setAccessId] = useState<string | null>(null);
   const [mandate, setMandate] = useState<MandateInfo | null>(null);
   const [recordsPage, setRecordsPage] = useState(0);
+  const [myMandates, setMyMandates] = useState<string[]>([]);
+
+  // The consumer "verify" view is the default; "build" adds the developer tools.
+  const [mode, setMode] = useState<"verify" | "build">(() => {
+    try {
+      return new URLSearchParams(window.location.search).has("dev") ? "build" : "verify";
+    } catch {
+      return "verify";
+    }
+  });
   const [auditor, setAuditor] = useState("");
   const [grant, setGrant] = useState<{ status: "idle" | "running" | "ok" | "fail"; msg?: string }>(
     { status: "idle" },
@@ -228,6 +239,23 @@ export function App() {
     };
   }, [account, mandateId]);
 
+  // The agents this wallet owns, so it can inspect its own without pasting ids.
+  useEffect(() => {
+    if (!account) {
+      setMyMandates([]);
+      return;
+    }
+    let cancelled = false;
+    fetchMyMandates(account.address)
+      .then((ids) => {
+        if (!cancelled) setMyMandates(ids);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [account]);
+
   const onVerify = useCallback(
     async (r: AnchoredRecord) => {
       if (!account) return;
@@ -354,6 +382,24 @@ export function App() {
           you and people you allow can read it, and proven on chain. So you see what it really
           did, not just what it claims.
         </p>
+        <div className="mode-toggle" role="tablist">
+          <button
+            role="tab"
+            aria-selected={mode === "verify"}
+            className={`mode-tab${mode === "verify" ? " is-on" : ""}`}
+            onClick={() => setMode("verify")}
+          >
+            Verify an agent
+          </button>
+          <button
+            role="tab"
+            aria-selected={mode === "build"}
+            className={`mode-tab${mode === "build" ? " is-on" : ""}`}
+            onClick={() => setMode("build")}
+          >
+            Build with the SDK
+          </button>
+        </div>
       </header>
 
       <section className={`how hud${started ? " play" : ""}`}>
@@ -386,6 +432,7 @@ export function App() {
         </div>
       </section>
 
+      {mode === "build" && (
       <section className="setup">
         <span className="label">Register an agent</span>
         {!account ? (
@@ -474,14 +521,39 @@ export function App() {
           </>
         )}
       </section>
+      )}
 
       <section className="finder">
         <label className="label" htmlFor="mandate">
           Inspect an agent
         </label>
+
+        {account && myMandates.length > 0 && (
+          <>
+            <p className="finder-hint">
+              Your agents, the ones this wallet owns. Pick one to see and verify what it has done.
+            </p>
+            <div className="demo-agents">
+              {myMandates.map((m) => (
+                <button
+                  key={m}
+                  className={`demo-pill${mandateId === m ? " is-on" : ""}`}
+                  onClick={() => {
+                    setInput("");
+                    setMandateId(m);
+                  }}
+                >
+                  Agent · {short(m, 6, 4)}
+                </button>
+              ))}
+            </div>
+          </>
+        )}
+
         <p className="finder-hint">
-          Try one of our demo agents, both built with Avow and running live, then verify what they
-          did. Or paste any agent's id to inspect it.
+          {account && myMandates.length > 0
+            ? "Or try one of ours, or paste any agent's id."
+            : "Connect your wallet (top right) to see your own agents, or try one of ours below. Either way, you verify what the agent did, you never just trust it."}
         </p>
         <div className="demo-agents">
           {DEMO_AGENTS.map((a) => (
@@ -494,8 +566,7 @@ export function App() {
               }}
               title={a.blurb}
             >
-              <span className="demo-pill-name">{a.name}</span>
-              <span className="demo-pill-tag">{a.tag}</span>
+              {a.name}
             </button>
           ))}
         </div>
@@ -516,7 +587,7 @@ export function App() {
         </div>
       </section>
 
-      {capId && (
+      {mode === "build" && capId && (
         <section className="owner-panel hud">
           <label className="label" htmlFor="auditor">
             You own this mandate · grant an auditor read access
@@ -572,6 +643,7 @@ export function App() {
         verifySign={verifySign}
         perMoveCap={mandate?.perMoveCap ?? null}
         canAnchor={youAreAgent}
+        showAnchor={mode === "build"}
         connected={!!account}
         agentAddress={account?.address}
         mandateId={mandateId}

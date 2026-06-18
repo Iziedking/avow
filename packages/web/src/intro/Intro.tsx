@@ -12,7 +12,6 @@ const STEPS: { phase: Phase; at: number }[] = [
   { phase: "confirm", at: 13000 },
   { phase: "resolve", at: 16000 },
 ];
-const END_MS = 17600;
 
 const HEX = "0123456789abcdef";
 function randHex(len: number): string {
@@ -100,7 +99,7 @@ export function Intro({ onDone }: { onDone: () => void }) {
         }, s.at),
       );
     }
-    timers.current.push(window.setTimeout(finish, END_MS));
+    // No auto-dismiss: the boot lands on a "Launch app" button the user clicks to enter.
 
     const blip = window.setInterval(() => audio.blip(), 720);
     const hexInt = window.setInterval(() => setHex((h) => [...h.slice(-7), randHex(48)]), 110);
@@ -181,6 +180,12 @@ export function Intro({ onDone }: { onDone: () => void }) {
 
           {(phase === "confirm" || phase === "resolve") && (
             <div className="confirm glow">HASH MATCHES THE ANCHOR ✓</div>
+          )}
+
+          {phase === "resolve" && (
+            <button className="gate-btn launch-btn" onClick={finish}>
+              Launch app ▸
+            </button>
           )}
         </div>
 

@@ -106,6 +106,30 @@ export async function fetchMandate(mandateId: string): Promise<MandateInfo | nul
   }
 }
 
+// The mandates a wallet owns: it holds a MandateCap for each. This is how a connected wallet
+// finds its own agents to inspect, without pasting any ids.
+export async function fetchMyMandates(owner: string): Promise<string[]> {
+  const client = suiClient();
+  try {
+    const res = await client.getOwnedObjects({
+      owner,
+      filter: { StructType: `${PACKAGE_ID}::mandate::MandateCap` },
+      options: { showContent: true },
+    });
+    const ids: string[] = [];
+    for (const o of res.data) {
+      const c = o.data?.content;
+      if (c && c.dataType === "moveObject") {
+        const f = (c as { fields: Record<string, unknown> }).fields;
+        if (f.mandate_id) ids.push(String(f.mandate_id));
+      }
+    }
+    return ids;
+  } catch {
+    return [];
+  }
+}
+
 // The single evidence access registered for a mandate, found from its AccessCreated event.
 export async function fetchAccessId(mandateId: string): Promise<string | null> {
   const client = suiClient();

@@ -235,6 +235,29 @@
   background: rgba(95, 208, 138, 0.08);
 }
 
+/* The launch button the boot lands on, the user clicks it to enter the app. */
+.launch-btn {
+  margin-top: 30px;
+  background: var(--green, #5fd08a);
+  color: #06140c;
+  animation: launchIn 0.5s ease both;
+}
+
+.launch-btn:hover {
+  background: #74e09c;
+}
+
+@keyframes launchIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 .gate-sub {
   color: #3f8f60;
   font-size: 11px;

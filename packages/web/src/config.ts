@@ -10,7 +10,6 @@ export const PACKAGE_ID =
 // independently verified. The consumer bill payer is shown first.
 export interface DemoAgent {
   name: string;
-  tag: string;
   blurb: string;
   mandateId: string;
 }
@@ -18,14 +17,12 @@ export interface DemoAgent {
 export const DEMO_AGENTS: DemoAgent[] = [
   {
     name: "Bill payer",
-    tag: "consumer",
     blurb:
       "Pays your bills automatically, and provably refuses overcharges, unknown billers, and anything over your limit.",
     mandateId: "0x745492d3c02d9095a81744a30024b72a27c5566229fa5db2fef672352012480f",
   },
   {
     name: "Yield router",
-    tag: "defi",
     blurb:
       "Routes funds to the best risk-adjusted yield, and provably ignores pools that are too risky.",
     mandateId: "0x1d6d7892132773b525278fd714b2acbfa96fff762ae0a0c3b97bd094b89568db",

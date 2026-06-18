@@ -245,6 +245,36 @@ button {
   font-weight: 500;
 }
 
+/* The consumer / developer mode toggle, a flat segmented control. */
+.mode-toggle {
+  display: inline-flex;
+  margin-top: 26px;
+  border: 1px solid var(--line);
+  background: var(--ink-850);
+  animation: rise 0.5s ease 0.1s both;
+}
+
+.mode-tab {
+  background: transparent;
+  border: 0;
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0.02em;
+  padding: 9px 18px;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.mode-tab + .mode-tab {
+  border-left: 1px solid var(--line);
+}
+
+.mode-tab.is-on {
+  background: var(--ink-750);
+  color: var(--green);
+}
+
 /* How it works */
 .how {
   display: grid;
@@ -379,21 +409,6 @@ button {
 
 .demo-pill.is-on {
   border-color: var(--green);
-}
-
-.demo-pill-name {
-  font-weight: 500;
-}
-
-.demo-pill-tag {
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-
-.demo-pill.is-on .demo-pill-tag {
-  color: var(--green-dim);
 }
 
 .records-intro {

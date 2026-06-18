@@ -37,6 +37,8 @@ export interface AgentRunProps {
   perMoveCap?: string | null;
   /** True when the connected wallet is the agent named in the loaded mandate. */
   canAnchor: boolean;
+  /** Whether to offer the developer live-anchor finale at all (build mode). */
+  showAnchor: boolean;
   connected: boolean;
   agentAddress?: string;
   mandateId: string;
@@ -196,24 +198,25 @@ export function AgentRun(props: AgentRunProps) {
         {busy && <span className="run-cursor" />}
       </div>
 
-      {props.canAnchor ? (
-        <div className="run-finale">
-          <button className="btn-green" onClick={anchorOne} disabled={busy}>
-            Create a real proof, live
-          </button>
-          <span className="run-finale-hint">
-            You are the agent of this mandate. This signs three times in your wallet (Walrus
-            register, certify, then anchor) and uses a little testnet SUI and WAL. The new proof
-            appears in the track record, then verify it above.
-          </span>
-        </div>
-      ) : props.connected ? (
-        <p className="run-note">
-          This mandate's agent is a different wallet, so its actions are recorded by the agent's
-          own code through the SDK or CLI. Connected here you are the owner or an auditor: you
-          verify and reveal. To create a live proof yourself, register an agent with this wallet.
-        </p>
-      ) : null}
+      {props.showAnchor &&
+        (props.canAnchor ? (
+          <div className="run-finale">
+            <button className="btn-green" onClick={anchorOne} disabled={busy}>
+              Create a real proof, live
+            </button>
+            <span className="run-finale-hint">
+              You are the agent of this mandate. This signs three times in your wallet (Walrus
+              register, certify, then anchor) and uses a little testnet SUI and WAL. The new proof
+              appears in the track record, then verify it above.
+            </span>
+          </div>
+        ) : props.connected ? (
+          <p className="run-note">
+            This mandate's agent is a different wallet, so its actions are recorded by the agent's
+            own code through the SDK or CLI. Connected here you are the owner or an auditor: you
+            verify and reveal. To create a live proof yourself, register an agent with this wallet.
+          </p>
+        ) : null)}
     </section>
   );
 }

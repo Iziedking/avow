@@ -1,8 +1,0 @@
-<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Avow anchor concept">
-  <rect width="512" height="512" fill="#0a0b0c"/>
-  <circle cx="256" cy="118" r="34" stroke="#5fd08a" stroke-width="18"/>
-  <path d="M256 152 L256 392" stroke="#5fd08a" stroke-width="18" stroke-linecap="round"/>
-  <path d="M188 206 L324 206" stroke="#5fd08a" stroke-width="18" stroke-linecap="round"/>
-  <path d="M146 300 C 150 372, 206 404, 256 404 C 306 404, 362 372, 366 300" stroke="#5fd08a" stroke-width="18" stroke-linecap="round"/>
-  <path d="M256 404 L256 360" stroke="#5fd08a" stroke-width="18" stroke-linecap="round"/>
-</svg>

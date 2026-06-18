@@ -22,7 +22,7 @@ import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
 import type { SignAndExecute } from "./anchorLive";
 import { beep } from "./beep";
-import { DEMO_MANDATE_ID, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
+import { DEMO_MANDATE_ID, DEMO_AGENTS, PACKAGE_ID, SUISCAN, WALRUS_AGGREGATOR } from "./config";
 
 type VerifyStatus = "idle" | "running" | "ok" | "fail";
 interface VerifyState {
@@ -50,6 +50,7 @@ function formatTime(ms: number): string {
 const ACTION_LABELS: Record<string, string> = {
   yield_move: "Yield rebalance",
   payment: "Payment",
+  payment_refused: "Payment refused",
   trade: "Trade",
   transfer: "Transfer",
 };
@@ -476,12 +477,28 @@ export function App() {
 
       <section className="finder">
         <label className="label" htmlFor="mandate">
-          Look up a mandate
+          Inspect an agent
         </label>
         <p className="finder-hint">
-          A mandate is the rulebook an agent runs under. Paste its id to see everything that
-          agent has done.
+          Try one of our demo agents, both built with Avow and running live, then verify what they
+          did. Or paste any agent's id to inspect it.
         </p>
+        <div className="demo-agents">
+          {DEMO_AGENTS.map((a) => (
+            <button
+              key={a.mandateId}
+              className={`demo-pill${mandateId === a.mandateId ? " is-on" : ""}`}
+              onClick={() => {
+                setInput("");
+                setMandateId(a.mandateId);
+              }}
+              title={a.blurb}
+            >
+              <span className="demo-pill-name">{a.name}</span>
+              <span className="demo-pill-tag">{a.tag}</span>
+            </button>
+          ))}
+        </div>
         <div className="finder-row">
           <input
             id="mandate"
@@ -532,9 +549,22 @@ export function App() {
         </div>
         <div className="stat">
           <span className="stat-num tnum">{group(totalMoved.toString())}</span>
-          <span className="stat-label">total moved, in the token's smallest unit</span>
+          <span className="stat-label">total moved across all actions</span>
         </div>
       </section>
+
+      {mandate && records.length > 0 && (
+        <div className="verdict hud">
+          <span className="verdict-mark">✓</span>
+          <p>
+            <strong>Every action your agent took stayed within your limits.</strong> All {moves}{" "}
+            were inside the {group(mandate.perMoveCap)} per-action limit you set. Avow checks that
+            limit the moment each action is recorded, so one that broke your rules could never have
+            been saved here. Open any action below to see exactly what it did, and why, you never
+            have to take its word for it.
+          </p>
+        </div>
+      )}
 
       <AgentRun
         records={records}

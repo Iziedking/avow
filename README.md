@@ -106,13 +106,21 @@ The reference agent running one cycle (observe, decide, move, prove):
 npx tsx packages/agent/scripts/run.ts
 ```
 
-A full live experiment: the agent runs several cycles against a changing rate feed, moving when
-a better yield clears the threshold and holding when it does not, and anchors every move as a
-verifiable proof. It prints a mandate id you can paste into the dashboard or verify from the CLI:
+Two reference agents, both built on the SDK, show the two sides of Avow. The DeFi one routes
+funds to the best risk-adjusted yield and provably ignores pools that are too risky:
 
 ```bash
 npx tsx packages/agent/scripts/experiment.ts
 ```
+
+The consumer one pays bills, and provably refuses overcharges, unknown billers, and anything over
+your limit, recording every decision (paid and refused) with its reasoning:
+
+```bash
+npx tsx packages/agent/scripts/bills.ts
+```
+
+Each prints a mandate id you can paste into the dashboard or verify from the CLI.
 
 The dashboard:
 

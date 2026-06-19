@@ -88,7 +88,8 @@ export function WalletConnect() {
   if (account) {
     return (
       <div className="wc">
-        <button className="wc-btn" onClick={() => setMenu((m) => !m)}>
+        <button className="wc-btn is-connected" onClick={() => setMenu((m) => !m)}>
+          <span className="wc-dot" aria-hidden="true" />
           {short(account.address)}
         </button>
         {menu && (

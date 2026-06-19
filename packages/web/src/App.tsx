@@ -790,9 +790,15 @@ export function App() {
                 role="tab"
                 aria-selected={viewIndex === i}
                 className={`viewas-tab${viewIndex === i ? " is-on" : ""}`}
+                title={
+                  i === 0
+                    ? "The agent's operator (the business running it). The owner key can decrypt every consumer's records, for support and audit."
+                    : `A consumer of this shared agent. ${idn.name}'s key decrypts only their own records, nobody else's.`
+                }
                 onClick={() => {
                   setViewAs(i);
                   setRecordsPage(0);
+                  setVerify({});
                 }}
               >
                 {idn.name}
@@ -801,8 +807,8 @@ export function App() {
           </div>
           <p className="viewas-note">
             {viewIndex === 0
-              ? `Owner view: every consumer's records (${records.length}). Pick a consumer to see that they only ever see their own.`
-              : `Viewing as ${activeIdentity?.name}: ${shownRecords.length} of ${records.length} records are sealed to them. The other ${records.length - shownRecords.length} belong to another consumer, and ${activeIdentity?.name}'s key cannot decrypt them.`}
+              ? `Owner is the operator that runs this agent (the business behind it): its key sees every consumer's records (${records.length}), for support and audit. Pick a consumer below to see they only ever see their own.`
+              : `Viewing as ${activeIdentity?.name}, a consumer of this agent: ${shownRecords.length} of ${records.length} records are sealed to them. The other ${records.length - shownRecords.length} belong to another consumer, and ${activeIdentity?.name}'s key cannot decrypt them.`}
           </p>
         </div>
       )}
@@ -831,6 +837,7 @@ export function App() {
       )}
 
       <AgentRun
+        key={`${mandateId}:${viewIndex}`}
         records={shownRecords}
         account={readerAddress}
         verifySign={readerSign}

@@ -93,7 +93,15 @@ function Mark() {
 }
 
 export function App() {
-  const [mandateId, setMandateId] = useState("");
+  // A mandate can be pre-loaded from the URL (?mandate=0x...), so the Agent console's
+  // "Verify on Avow" link drops you straight onto the right agent.
+  const [mandateId, setMandateId] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get("mandate") ?? "";
+    } catch {
+      return "";
+    }
+  });
   const [input, setInput] = useState("");
   const [showDemos, setShowDemos] = useState(false);
   const [records, setRecords] = useState<AnchoredRecord[]>([]);

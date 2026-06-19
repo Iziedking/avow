@@ -48,7 +48,7 @@ export const SEAL_KEY_SERVERS: KeyServer[] = [
 export const SEAL_THRESHOLD = 2;
 
 // How long evidence blobs are stored on Walrus, in epochs. A testnet epoch is about a day.
-export const WALRUS_EPOCHS = 5;
+export const WALRUS_EPOCHS = Number(env("AVOW_WALRUS_EPOCHS")) || 5;
 
 // Writes go through Mysten's upload relay rather than fanning out to many storage nodes
 // directly, which is far more reliable from a single machine. Source: Walrus network

@@ -19,7 +19,7 @@ import { findCapForMandate } from "./caps";
 import { setupMandate } from "./setup";
 import { verifyRecord, type SignPersonalMessage } from "./verify";
 import { describeObserved } from "./reveal";
-import { isDemoMandate, demoReaderAddress, demoReaderSign } from "./demoReader";
+import { isDemoMandate, demoIdentities } from "./demoReader";
 import { ReasoningFlow, type ReasoningTrace } from "./Reasoning";
 import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
@@ -106,6 +106,8 @@ export function App() {
   const [mandate, setMandate] = useState<MandateInfo | null>(null);
   const [recordsPage, setRecordsPage] = useState(0);
   const [myMandates, setMyMandates] = useState<string[]>([]);
+  // For a multi-user demo agent: which identity you are viewing as (0 = Owner, sees all).
+  const [viewAs, setViewAs] = useState(0);
 
   // The consumer "verify" view is the default; "build" adds the developer tools. Remembered
   // across refreshes, and ?dev forces it on.
@@ -224,6 +226,7 @@ export function App() {
     setError("");
     setVerify({});
     setRecordsPage(0);
+    setViewAs(0);
     if (!id.trim()) {
       setRecords([]);
       setStatus("idle");
@@ -311,11 +314,13 @@ export function App() {
 
   const onVerify = useCallback(
     async (r: AnchoredRecord) => {
-      // Demo agents verify through the demo reader; others need the connected wallet.
+      // Demo agents verify through the selected identity (Owner, or a specific user with their
+      // own key); other agents need the connected wallet.
       const demo = isDemoMandate(r.mandateId);
-      const reader = demo ? demoReaderAddress : account?.address;
-      const sign: SignPersonalMessage = demo
-        ? demoReaderSign
+      const idn = demo ? demoIdentities[Math.min(viewAs, demoIdentities.length - 1)] : null;
+      const reader = idn ? idn.address : account?.address;
+      const sign: SignPersonalMessage = idn
+        ? (idn.sign as SignPersonalMessage)
         : async ({ message }) => {
             const res = await signPersonalMessage({ message });
             return { signature: res.signature };
@@ -342,7 +347,7 @@ export function App() {
         }));
       }
     },
-    [account, signPersonalMessage],
+    [account, signPersonalMessage, viewAs],
   );
 
   const onGrant = useCallback(async () => {
@@ -386,13 +391,24 @@ export function App() {
     }
   }, [account, setupAgent, setupPerMove, setupDaily, signAndExecute]);
 
-  const moves = records.length;
-  const totalMoved = records.reduce((sum, r) => sum + BigInt(r.amount || "0"), 0n);
+  // "View as" only applies to a demo agent. Owner (index 0) sees every user's records; each
+  // other identity sees only the records sealed to its own address.
+  const isDemo = isDemoMandate(mandateId);
+  const identities = isDemo ? demoIdentities : [];
+  const viewIndex = isDemo ? Math.min(viewAs, identities.length - 1) : 0;
+  const activeIdentity = isDemo ? identities[viewIndex] : null;
+  const shownRecords =
+    activeIdentity && viewIndex > 0
+      ? records.filter((r) => r.user === activeIdentity.address)
+      : records;
+
+  const moves = shownRecords.length;
+  const totalMoved = shownRecords.reduce((sum, r) => sum + BigInt(r.amount || "0"), 0n);
 
   const PER_PAGE = 6;
-  const pageCount = Math.max(1, Math.ceil(records.length / PER_PAGE));
+  const pageCount = Math.max(1, Math.ceil(shownRecords.length / PER_PAGE));
   const page = Math.min(recordsPage, pageCount - 1);
-  const pageRecords = records.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
+  const pageRecords = shownRecords.slice(page * PER_PAGE, page * PER_PAGE + PER_PAGE);
 
   // The live-anchor finale runs only when the connected wallet is the agent of this mandate.
   const youAreAgent =
@@ -408,11 +424,11 @@ export function App() {
     return { signature: res.signature };
   };
 
-  // Demo agents can be verified by anyone through the pre-granted demo reader; for any other
-  // agent, the connected wallet must be an authorized reader.
-  const isDemo = isDemoMandate(mandateId);
-  const readerAddress = isDemo ? demoReaderAddress : account?.address;
-  const readerSign: SignPersonalMessage = isDemo ? demoReaderSign : verifySign;
+  // For a demo agent you verify through the selected identity (Owner sees all, each user only
+  // their own); for any other agent, the connected wallet must be an authorized reader.
+  const readerAddress = activeIdentity ? activeIdentity.address : account?.address;
+  const readerSign: SignPersonalMessage =
+    activeIdentity ? (activeIdentity.sign as SignPersonalMessage) : verifySign;
 
   const agentIdHelp = (
     <span
@@ -764,6 +780,32 @@ export function App() {
 
       {mandateId && (
       <>
+      {isDemo && identities.length > 1 && (
+        <div className="viewas hud">
+          <span className="viewas-label">View as</span>
+          <div className="viewas-tabs" role="tablist">
+            {identities.map((idn, i) => (
+              <button
+                key={idn.address}
+                role="tab"
+                aria-selected={viewIndex === i}
+                className={`viewas-tab${viewIndex === i ? " is-on" : ""}`}
+                onClick={() => {
+                  setViewAs(i);
+                  setRecordsPage(0);
+                }}
+              >
+                {idn.name}
+              </button>
+            ))}
+          </div>
+          <p className="viewas-note">
+            {viewIndex === 0
+              ? `Owner view: every consumer's records (${records.length}). Pick a consumer to see that they only ever see their own.`
+              : `Viewing as ${activeIdentity?.name}: ${shownRecords.length} of ${records.length} records are sealed to them. The other ${records.length - shownRecords.length} belong to another consumer, and ${activeIdentity?.name}'s key cannot decrypt them.`}
+          </p>
+        </div>
+      )}
       <section className="summary hud">
         <div className="stat">
           <span className="stat-num">{moves}</span>
@@ -775,7 +817,7 @@ export function App() {
         </div>
       </section>
 
-      {mandate && records.length > 0 && (
+      {mandate && shownRecords.length > 0 && (
         <div className="verdict hud">
           <span className="verdict-mark">✓</span>
           <p>
@@ -789,7 +831,7 @@ export function App() {
       )}
 
       <AgentRun
-        records={records}
+        records={shownRecords}
         account={readerAddress}
         verifySign={readerSign}
         perMoveCap={mandate?.perMoveCap ?? null}
@@ -969,7 +1011,7 @@ export function App() {
             Prev
           </button>
           <span className="pager-at">
-            page {page + 1} of {pageCount} · {records.length} records
+            page {page + 1} of {pageCount} · {shownRecords.length} records
           </span>
           <button
             className="btn-ghost"

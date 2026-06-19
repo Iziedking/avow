@@ -13,6 +13,8 @@ export interface AnchoredRecord {
   mandateId: string;
   accessId: string;
   agent: string;
+  /** The user this action was taken for; the dashboard filters by it for the "view as" switcher. */
+  user: string;
   blobId: string;
   evidenceHashHex: string;
   amount: string;
@@ -45,6 +47,7 @@ function parseAnchored(e: { parsedJson: unknown; id: { txDigest: string }; times
     mandateId: String(j.mandate_id),
     accessId: String(j.access_id),
     agent: String(j.agent),
+    user: String(j.user ?? ""),
     blobId: toText(j.blob_id),
     evidenceHashHex: toHex(toBytes(j.evidence_hash)),
     amount: String(j.amount),

@@ -644,6 +644,56 @@ button {
   white-space: pre-wrap;
 }
 
+/* "View as" switcher: prove the per-user isolation on a shared agent, live. */
+.viewas {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 14px 16px;
+  margin-bottom: 14px;
+}
+
+.viewas-label {
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.viewas-tabs {
+  display: inline-flex;
+  border: 1px solid var(--line-2);
+}
+
+.viewas-tab {
+  background: transparent;
+  border: 0;
+  color: var(--text-dim);
+  font-family: var(--sans);
+  font-size: 13px;
+  padding: 7px 16px;
+  cursor: pointer;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+
+.viewas-tab + .viewas-tab {
+  border-left: 1px solid var(--line-2);
+}
+
+.viewas-tab.is-on {
+  background: var(--ink-750);
+  color: var(--green);
+}
+
+.viewas-note {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
 .records-intro {
   margin: 0 0 18px;
   max-width: 70ch;

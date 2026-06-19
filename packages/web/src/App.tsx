@@ -312,6 +312,19 @@ export function App() {
     };
   }, [account]);
 
+  // When the wallet disconnects, reset the page to its fresh, pre-connection state so nothing
+  // from the connected session lingers. Clearing the loaded agent cascades through the load
+  // effect, which also resets the records, reveals, view, and pagination.
+  const prevAccount = useRef<string | null>(null);
+  useEffect(() => {
+    const cur = account?.address ?? null;
+    if (prevAccount.current && !cur) {
+      setMandateId("");
+      setShowDemos(false);
+    }
+    prevAccount.current = cur;
+  }, [account]);
+
   const onVerify = useCallback(
     async (r: AnchoredRecord) => {
       // Demo agents verify through the selected identity (Owner, or a specific user with their

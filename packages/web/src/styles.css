@@ -537,6 +537,113 @@ button {
   color: var(--text-dim);
 }
 
+/* Reasoning flow: the agent's full thinking toward one action, revealed after verify. */
+.reasoning {
+  margin-top: 8px;
+}
+
+.reasoning-cap {
+  padding: 10px 14px;
+  background: var(--ink-850);
+  border: 1px solid var(--line-2);
+}
+
+.reasoning-out {
+  border-color: rgba(95, 208, 138, 0.45);
+}
+
+.reasoning-k {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 10px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.reasoning-goal {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.reasoning-steps {
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+}
+
+.rstep {
+  position: relative;
+  margin-left: 7px;
+  padding: 9px 0 9px 26px;
+  border-left: 1px solid var(--line-2);
+}
+
+.rstep:last-child {
+  border-left-color: transparent;
+}
+
+.rstep-node {
+  position: absolute;
+  left: -5px;
+  top: 14px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink-750);
+  border: 1px solid var(--text-faint);
+}
+
+.rstep-observe .rstep-node {
+  border-color: #d8b25f;
+}
+.rstep-tool .rstep-node {
+  border-color: #6fb3ff;
+}
+.rstep-decide .rstep-node {
+  background: var(--green);
+  border-color: var(--green);
+}
+
+.rstep-kind {
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.rstep-decide .rstep-kind {
+  color: var(--green);
+}
+
+.rstep-title {
+  margin: 2px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text);
+}
+
+.rstep-detail {
+  margin: 3px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+
+.rstep-data {
+  margin: 6px 0 0;
+  padding: 8px 10px;
+  background: var(--ink-850);
+  border: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+
 .records-intro {
   margin: 0 0 18px;
   max-width: 70ch;

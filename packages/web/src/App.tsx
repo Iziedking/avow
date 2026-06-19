@@ -20,6 +20,7 @@ import { setupMandate } from "./setup";
 import { verifyRecord, type SignPersonalMessage } from "./verify";
 import { describeObserved } from "./reveal";
 import { isDemoMandate, demoReaderAddress, demoReaderSign } from "./demoReader";
+import { ReasoningFlow, type ReasoningTrace } from "./Reasoning";
 import { Intro } from "./intro/Intro";
 import { AgentRun } from "./AgentRun";
 import type { SignAndExecute } from "./anchorLive";
@@ -31,6 +32,7 @@ interface VerifyState {
   status: VerifyStatus;
   rationale?: string;
   observed?: unknown;
+  reasoning?: ReasoningTrace;
   error?: string;
 }
 
@@ -329,6 +331,7 @@ export function App() {
             status: out.hashMatches ? "ok" : "fail",
             rationale: out.rationale,
             observed: out.bundle?.observed,
+            reasoning: out.bundle?.reasoning as ReasoningTrace | undefined,
             error: out.hashMatches ? undefined : "Recomputed hash did not match the anchor.",
           },
         }));
@@ -930,11 +933,18 @@ export function App() {
                         </ul>
                       </div>
                     )}
-                    {v.rationale && (
+                    {v.reasoning ? (
                       <div className="reveal-block">
-                        <span className="reveal-k">why it acted</span>
-                        <p className="reveal-why">“{v.rationale}”</p>
+                        <span className="reveal-k">how it reasoned</span>
+                        <ReasoningFlow trace={v.reasoning} />
                       </div>
+                    ) : (
+                      v.rationale && (
+                        <div className="reveal-block">
+                          <span className="reveal-k">why it acted</span>
+                          <p className="reveal-why">“{v.rationale}”</p>
+                        </div>
+                      )
                     )}
                   </div>
                 )}

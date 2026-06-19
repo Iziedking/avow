@@ -6,6 +6,7 @@ import {
 } from "@mysten/dapp-kit";
 import { WalletConnect } from "./WalletConnect";
 import { Docs } from "./Docs";
+import { isDevMode, setDevMode } from "./devmode";
 import { Transaction } from "@mysten/sui/transactions";
 import {
   fetchRecords,
@@ -156,6 +157,12 @@ export function App() {
     }
   }, [mode]);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [devMode, setDevModeState] = useState(isDevMode);
+  const toggleDevMode = () => {
+    const next = !devMode;
+    setDevModeState(next);
+    setDevMode(next);
+  };
   const [soundMuted, setSoundMuted] = useState(() => {
     try {
       return localStorage.getItem("avow-muted") === "1";
@@ -1091,11 +1098,20 @@ export function App() {
         chain, or the record does not verify.
       </p>
 
-      <a className="console-cta reveal" href="/?console">
-        <span className="cc-prompt">&gt;_</span>
-        <span className="cc-text">Testnet Console</span>
-        <span className="cc-sub">claim a live DeepBook agent ·  instruct it in plain English</span>
-      </a>
+      <div className="console-ctas reveal">
+        <a className="console-cta" href="/?console">
+          <span className="cc-prompt">&gt;_</span>
+          <span className="cc-text">Testnet Console</span>
+          <span className="cc-sub">claim a live DeepBook agent ·  instruct it in plain English</span>
+        </a>
+        {devMode && (
+          <a className="console-cta" href="/?dev">
+            <span className="cc-prompt">&gt;_</span>
+            <span className="cc-text">Developer Console</span>
+            <span className="cc-sub">grant auditors ·  revoke ·  verify proofs ·  call the SDK</span>
+          </a>
+        )}
+      </div>
 
       <footer className="site-foot reveal">
         <div className="foot-main">
@@ -1123,6 +1139,13 @@ export function App() {
         </div>
         <div className="foot-base">
           <span>Apache-2.0</span>
+          <button
+            className={`dev-toggle${devMode ? " is-on" : ""}`}
+            onClick={toggleDevMode}
+            title="Reveal the Developer Console (grant, revoke, verify, SDK)"
+          >
+            <span className="dt-dot" /> developer mode <span className="dt-state">{devMode ? "on" : "off"}</span>
+          </button>
           <span className="foot-meta">testnet · {short(PACKAGE_ID)}</span>
         </div>
       </footer>

@@ -811,6 +811,41 @@ button {
   background: color-mix(in oklab, var(--green) 55%, transparent);
 }
 
+/* Developer console line kinds. */
+.dc-out {
+  color: var(--green);
+  white-space: pre-wrap;
+}
+.dc-dim {
+  color: var(--text-dim);
+  white-space: pre-wrap;
+}
+.dc-ok {
+  color: #8fe9b6;
+  padding-left: 2px;
+  border-left: 2px solid var(--green);
+  padding: 1px 0 1px 8px;
+}
+.dc-err {
+  color: #e6a463;
+}
+.dc-head {
+  color: #cfeede;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 11px;
+  margin-top: 10px;
+  margin-bottom: 2px;
+}
+.dc-code {
+  color: color-mix(in oklab, var(--green) 64%, #9fb3aa);
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+.dc-link {
+  color: var(--green);
+}
+
 .ac-idle p {
   margin: 0 0 4px;
 }
@@ -1610,6 +1645,20 @@ input:focus {
 
 /* Footer, with a neon Avow as the one flourish. Placed here so the glow has room to bleed. */
 /* Testnet Console call-to-action: a computerized, boxed terminal panel before the footer. */
+.console-ctas {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 18px;
+  margin: 64px auto 8px;
+  max-width: 960px;
+}
+.console-ctas .console-cta {
+  margin: 0;
+  flex: 1 1 360px;
+  max-width: 460px;
+}
+
 .console-cta {
   display: flex;
   flex-direction: column;
@@ -1769,6 +1818,46 @@ input:focus {
 
 .foot-meta {
   font-variant-numeric: tabular-nums;
+}
+
+/* A quiet switch that reveals the Developer Console. Off by default, so consumers never see it. */
+.dev-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 0;
+  padding: 4px 6px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  transition: color 0.2s ease;
+}
+.dev-toggle:hover {
+  color: var(--text-dim);
+}
+.dev-toggle .dt-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: background 0.2s ease, box-shadow 0.2s ease;
+}
+.dev-toggle.is-on {
+  color: var(--green-dim);
+}
+.dev-toggle.is-on .dt-dot {
+  background: var(--green);
+  box-shadow: 0 0 8px color-mix(in oklab, var(--green) 60%, transparent);
+}
+.dev-toggle .dt-state {
+  color: var(--text-dim);
+}
+.dev-toggle.is-on .dt-state {
+  color: var(--green);
 }
 
 @media (max-width: 560px) {

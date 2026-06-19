@@ -13,8 +13,8 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import {
-  getSuiClient, getSealClient, getWalrusClient, createMandate, anchor, Reasoning, createMemory,
-  EVIDENCE_VERSION, PACKAGE_ID, NETWORK,
+  getSuiClient, getSealClient, getWalrusClient, createMandate, anchor, verify, createSession,
+  listRecords, Reasoning, createMemory, EVIDENCE_VERSION, PACKAGE_ID, NETWORK,
 } from "avow-sdk";
 import { makePlan, makeReasoning, hasLLMKey, type Plan, type PlanStep, type Token } from "./brain";
 import { marketSnapshot, swap, placeLimit, deposit, withdraw, cancelAll, createManager, execWithRetry, balance, POOL_PAIRS, COIN_TYPE } from "./deepbook";
@@ -104,6 +104,104 @@ function agentForOwner(owner: string): { agentAddress: string; mandateId: string
     if (e.owner.toLowerCase() === owner.toLowerCase()) found = { agentAddress: e.kp.getPublicKey().toSuiAddress(), mandateId };
   }
   return found;
+}
+
+// ---- Developer / admin surface: an owner administers the mandates it claimed, and the SDK is
+// exercised live (grant an auditor, revoke a mandate, verify a proof, remember/recall). The
+// MandateCap for each mandate is held by its agent (it created the mandate), and the server holds
+// the agent keys, so it signs on the connecting owner's authority. ----
+
+function ownerMandates(owner: string) {
+  const out: { mandateId: string; agentAddress: string; accessId: string }[] = [];
+  for (const [mandateId, e] of agents) {
+    if (e.owner.toLowerCase() === owner.toLowerCase())
+      out.push({ mandateId, agentAddress: e.kp.getPublicKey().toSuiAddress(), accessId: e.accessId });
+  }
+  return out;
+}
+
+function ownedEntry(owner: string, mandateId: string) {
+  const e = agents.get(mandateId);
+  if (!e) throw new Error("unknown mandate");
+  if (e.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("that mandate is not yours to administer");
+  return e;
+}
+
+async function capIdForAgent(agentAddr: string, mandateId: string): Promise<string> {
+  const res = await sui.getOwnedObjects({ owner: agentAddr, filter: { StructType: `${PACKAGE_ID}::mandate::MandateCap` }, options: { showContent: true } });
+  for (const o of res.data) {
+    const f = (o.data?.content as { fields?: Record<string, unknown> } | undefined)?.fields;
+    if (f && String(f.mandate_id) === mandateId) return o.data!.objectId;
+  }
+  throw new Error("MandateCap not found for that mandate");
+}
+
+// List the owner's mandates with on-chain status: revoked? how many proofs anchored?
+async function devMandates(owner: string) {
+  const mine = ownerMandates(owner);
+  const mandates = await Promise.all(
+    mine.map(async (m) => {
+      let revoked = false;
+      let records = 0;
+      try {
+        const obj = await sui.getObject({ id: m.mandateId, options: { showContent: true } });
+        revoked = Boolean((obj.data?.content as { fields?: { revoked?: unknown } } | undefined)?.fields?.revoked);
+      } catch {
+        /* unreadable; leave as not-revoked */
+      }
+      try {
+        records = (await listRecords(sui, m.mandateId, 25)).length;
+      } catch {
+        /* event read failed; leave at 0 */
+      }
+      return { ...m, revoked, records };
+    }),
+  );
+  return { admin: owner, platform: platformAddr, isPlatform: owner.toLowerCase() === platformAddr.toLowerCase(), mandates };
+}
+
+// Grant an auditor read access (record::add_auditor), signed by the agent cap on the owner's authority.
+async function devGrant(owner: string, mandateId: string, auditor: string) {
+  const e = ownedEntry(owner, mandateId);
+  const capId = await capIdForAgent(e.kp.getPublicKey().toSuiAddress(), mandateId);
+  const res = await execWithRetry(async () => {
+    const tx = new Transaction();
+    tx.moveCall({ target: `${PACKAGE_ID}::record::add_auditor`, arguments: [tx.object(e.accessId), tx.object(capId), tx.pure.address(auditor)] });
+    return tx;
+  }, e.kp);
+  return { ok: true, mandateId, auditor, digest: res!.digest };
+}
+
+// The owner's kill switch: revoke the whole mandate (mandate::revoke); the agent can no longer act.
+async function devRevoke(owner: string, mandateId: string) {
+  const e = ownedEntry(owner, mandateId);
+  const capId = await capIdForAgent(e.kp.getPublicKey().toSuiAddress(), mandateId);
+  const res = await execWithRetry(async () => {
+    const tx = new Transaction();
+    tx.moveCall({ target: `${PACKAGE_ID}::mandate::revoke`, arguments: [tx.object(mandateId), tx.object(capId)] });
+    return tx;
+  }, e.kp);
+  return { ok: true, mandateId, digest: res!.digest };
+}
+
+// Verify the latest anchored proof the way an auditor would: read from Walrus, decrypt via Seal,
+// recompute the hash, check it sits within the mandate. The agent is a valid reader of its own
+// evidence, so the server can run verify() end to end as a live SDK demo.
+async function devVerify(owner: string, mandateId: string) {
+  const e = ownedEntry(owner, mandateId);
+  const records = await listRecords(sui, mandateId, 10);
+  if (!records.length) throw new Error("no proofs anchored for this mandate yet; instruct the agent first");
+  const record = records[0];
+  const sessionKey = await createSession(sui, e.kp);
+  const r = await verify({ suiClient: sui, sealClient: seal, walrusClient: walrus, sessionKey, record });
+  const reasoning = r.bundle.reasoning as { goal?: string; steps?: { title: string }[] } | undefined;
+  return {
+    record: { actionType: record.actionType, amount: record.amount, target: record.target, txDigest: record.txDigest },
+    result: { hashMatches: r.hashMatches, amountMatches: r.amountMatches, withinMandate: r.withinMandate },
+    goal: reasoning?.goal,
+    steps: (reasoning?.steps ?? []).map((s) => s.title),
+    rationale: r.bundle.rationale,
+  };
 }
 
 // Fund a fresh agent with gas SUI + WAL (storage) + DEEP (DeepBook taker fees) in one atomic tx,
@@ -411,6 +509,34 @@ const server = createServer(async (req, res) => {
       const { mandateId, instruction } = await json(req);
       return send(200, await runInstruction(String(mandateId), String(instruction ?? "swap 1 SUI")));
     }
+    // Developer / admin console endpoints.
+    if (req.method === "POST" && req.url === "/dev/mandates") {
+      const { owner } = await json(req);
+      if (!String(owner).startsWith("0x")) return send(400, { error: "connect a wallet first" });
+      return send(200, await devMandates(String(owner)));
+    }
+    if (req.method === "POST" && req.url === "/dev/grant") {
+      const { owner, mandateId, auditor } = await json(req);
+      if (!String(auditor).startsWith("0x") || String(auditor).length < 10) return send(400, { error: "give an auditor address (0x...)" });
+      return send(200, await devGrant(String(owner), String(mandateId), String(auditor)));
+    }
+    if (req.method === "POST" && req.url === "/dev/revoke") {
+      const { owner, mandateId } = await json(req);
+      return send(200, await devRevoke(String(owner), String(mandateId)));
+    }
+    if (req.method === "POST" && req.url === "/dev/verify") {
+      const { owner, mandateId } = await json(req);
+      return send(200, await devVerify(String(owner), String(mandateId)));
+    }
+    if (req.method === "POST" && req.url === "/dev/remember") {
+      const { owner, text } = await json(req);
+      await memory.remember(String(owner), String(text));
+      return send(200, { ok: memory.enabled, stored: String(text) });
+    }
+    if (req.method === "POST" && req.url === "/dev/recall") {
+      const { owner, query } = await json(req);
+      return send(200, { results: await memory.recall(String(owner), String(query), 6) });
+    }
     return res.writeHead(404).end();
   } catch (e) {
     send(500, { error: (e as Error).message });
@@ -420,7 +546,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`agent server on http://localhost:${PORT}`);
   console.log(`  platform: ${platformAddr}`);
-  console.log(`  brain:    ${hasLLMKey() ? "Claude (" + (process.env.AVOW_LLM_MODEL ?? "claude-haiku-4-5") + ")" : "rule-based (set ANTHROPIC_API_KEY for Claude)"}`);
+  console.log(`  brain:    ${hasLLMKey() ? "Claude (" + (process.env.AVOW_LLM_MODEL ?? "claude-sonnet-4-6") + " + " + (process.env.AVOW_REASONING_MODEL ?? "claude-haiku-4-5") + " for the proof trace)" : "rule-based (set ANTHROPIC_API_KEY for Claude)"}`);
   console.log(`  memory:   ${memory.enabled ? "MemWal on Walrus — the agent carries its memory across sessions" : "off (set MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID)"}`);
   console.log(`  POST /claim { owner }   ->  spins up a personal agent that grants the owner`);
   console.log(`  POST /agent { mandateId, instruction }  ->  plans, trades on DeepBook, proves it`);

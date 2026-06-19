@@ -5,18 +5,24 @@ import { SuiClientProvider, WalletProvider } from "@mysten/dapp-kit";
 import { getJsonRpcFullnodeUrl } from "@mysten/sui/jsonRpc";
 import { App } from "./App";
 import { AgentConsole } from "./AgentConsole";
+import { DevConsole } from "./DevConsole";
+import { isDevMode } from "./devmode";
 import { avowDark } from "./theme";
 
-// A dedicated terminal page for instructing the agent, served at ?console; everything else is
+// Three surfaces: ?console instructs the agent, ?dev is the developer/admin terminal (only when
+// developer mode is on — otherwise it stays hidden behind the home page), and everything else is
 // the dashboard (the Avow home, where you verify).
 function Root() {
-  let isConsole = false;
+  let route = "";
   try {
-    isConsole = new URLSearchParams(window.location.search).has("console");
+    const q = new URLSearchParams(window.location.search);
+    route = q.has("dev") ? "dev" : q.has("console") ? "console" : "";
   } catch {
-    isConsole = false;
+    route = "";
   }
-  return isConsole ? <AgentConsole /> : <App />;
+  if (route === "dev") return isDevMode() ? <DevConsole /> : <App />;
+  if (route === "console") return <AgentConsole />;
+  return <App />;
 }
 // Latin only, to keep the Walrus Site lean. Fraunces uses the weight-axis file; Plex Mono the
 // latin subset of the three weights we use.

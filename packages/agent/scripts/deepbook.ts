@@ -97,18 +97,32 @@ export async function balance(addr: string, token: Token): Promise<number> {
   return Number(b.totalBalance) / SCALAR[token];
 }
 
+// Mid prices barely move within a short window and the on-chain reads are the slow part, so cache
+// them briefly across instructions. Balances are always read fresh, they change as the agent trades.
+let priceCache: { at: number; prices: Record<string, number> } | null = null;
+
 export async function marketSnapshot(addr: string) {
   const db = makeDB(addr);
   const balances: Record<string, number> = {};
-  for (const t of TRADEABLE) balances[t] = await balance(addr, t);
-  const prices: Record<string, number> = {};
-  for (const p of POOLS) {
-    try {
-      prices[p] = Number((await db.midPrice(p)).toFixed(6));
-    } catch {
-      /* pool may be empty; skip */
-    }
-  }
+  const now = Date.now();
+  const fresh = priceCache !== null && now - priceCache.at < 10_000;
+  const prices: Record<string, number> = fresh ? priceCache!.prices : {};
+  // Read balances (and prices, only when the cache is cold) all at once.
+  await Promise.all([
+    ...TRADEABLE.map(async (t) => {
+      balances[t] = await balance(addr, t);
+    }),
+    ...(fresh
+      ? []
+      : POOLS.map(async (p) => {
+          try {
+            prices[p] = Number((await db.midPrice(p)).toFixed(6));
+          } catch {
+            /* pool may be empty; skip */
+          }
+        })),
+  ]);
+  if (!fresh) priceCache = { at: now, prices };
   return { balances, prices, pools: POOLS };
 }
 

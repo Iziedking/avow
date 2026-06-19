@@ -23,6 +23,7 @@ function Root() {
 import "@fontsource-variable/fraunces/wght.css";
 import "@fontsource-variable/saira/wght.css";
 import "@fontsource-variable/orbitron/wght.css";
+import "@fontsource/saira-stencil-one/latin.css";
 import "@fontsource/ibm-plex-mono/latin-400.css";
 import "@fontsource/ibm-plex-mono/latin-500.css";
 import "@fontsource/ibm-plex-mono/latin-600.css";

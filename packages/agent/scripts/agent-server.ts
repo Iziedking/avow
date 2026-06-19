@@ -16,7 +16,7 @@ import {
   getSuiClient, getSealClient, getWalrusClient, createMandate, anchor, Reasoning, createMemory,
   EVIDENCE_VERSION, PACKAGE_ID, NETWORK,
 } from "avow-sdk";
-import { makePlan, hasLLMKey, type Plan, type PlanStep, type Token } from "./brain";
+import { makePlan, makeReasoning, hasLLMKey, type Plan, type PlanStep, type Token } from "./brain";
 import { marketSnapshot, swap, placeLimit, deposit, withdraw, cancelAll, createManager, execWithRetry, balance, POOL_PAIRS, COIN_TYPE } from "./deepbook";
 
 // Load .env ourselves (tsx does not), so ANTHROPIC_API_KEY and friends are picked up.
@@ -274,30 +274,28 @@ async function runInstruction(mandateId: string, instruction: string) {
   const { kp, accessId, owner } = entry;
   const addr = kp.getPublicKey().toSuiAddress();
 
-  // Read the live market and recall long-term memory from Walrus.
-  const snap = await marketSnapshot(addr);
-  const longTerm = await memory.recall(owner, instruction);
-
-  // Carry this session's conversation so the agent understands follow-ups ("use 0.5"). On a fresh
-  // start (a new login, a server restart), recover it from Walrus, the agent picks the thread up.
-  let convo = conversations.get(mandateId);
-  if (!convo) {
-    convo = await memory.recallConversation(owner);
-    conversations.set(mandateId, convo);
-  }
+  // Read the market, recall long-term memory, and recover this session's conversation, all at once
+  // (this parallelism is the biggest latency win). On a fresh start (new login, server restart) the
+  // conversation comes back from Walrus, so the agent picks the thread back up.
+  // The long-term memory lookup is the slowest read, so only do it when the instruction actually
+  // reaches back ("sell my position", "profit", "again"). A plain "swap 1 SUI to USDC" skips it;
+  // the cached conversation still gives the agent recent context for follow-ups either way.
+  const needsMemory = /\b(profit|position|again|more|earlier|before|sell|hold|already|remember|continue|last|previous|what have|what did|my (wal|sui|usdc|deep|usdt|btc|dbusdc|dbtc))\b/i.test(instruction);
+  const cached = conversations.get(mandateId);
+  const [snap, longTerm, convo] = await Promise.all([
+    marketSnapshot(addr),
+    needsMemory ? memory.recall(owner, instruction, 4) : Promise.resolve([] as string[]),
+    cached ? Promise.resolve(cached) : memory.recallConversation(owner, 5),
+  ]);
+  if (!cached) conversations.set(mandateId, convo);
 
   const state = { ...snap, memory: longTerm, conversation: convo.slice(-8) };
-  const plan = hasLLMKey() ? await makePlan(instruction, state) : fallbackPlan(instruction, state);
 
-  // Rebuild the model's reasoning as an Avow trace.
-  const r = new Reasoning(plan.reasoning?.goal || `Instruction: "${instruction}"`);
-  for (const s of plan.reasoning?.steps ?? []) {
-    const d = s.detail ?? undefined;
-    if (s.kind === "observe") r.observe(s.title, d);
-    else if (s.kind === "tool") r.tool(s.title, d);
-    else if (s.kind === "decide") r.decide(s.title, d);
-    else r.think(s.title, d);
-  }
+  // Fast path: an explicit, self-contained swap ("swap 1 SUI to USDC") is handled by the parser
+  // instantly, no LLM round-trip and no quality lost on a trade that needs no judgement. Anything
+  // conversational, conditional, or memory-bound ("sell my WAL for profit", "use 0.5") goes to Claude.
+  const explicitSwap = /^\s*(swap|convert)\s+[\d.]+\s+[a-z]+\s+(to|for|into)\s+[a-z]+\s*\.?\s*$/i.test(instruction) && !needsMemory;
+  const plan = !hasLLMKey() || explicitSwap ? fallbackPlan(instruction, state) : await makePlan(instruction, state);
 
   // Execute the steps, enforcing the rule taken from the prompt. A step that can't run (too small,
   // untradeable, limit used up) becomes a plain-language note, not a crash.
@@ -315,41 +313,57 @@ async function runInstruction(mandateId: string, instruction: string) {
       failures.push((e as Error).message);
     }
   }
-  // Anchor a proof when the agent acted, or when it deliberately held (a decision worth proving).
-  // A purely conversational turn ("I can't trade that") just talks back, no record.
+  // A proof is anchored when the agent acted, or deliberately held (a decision worth proving). A
+  // purely conversational turn ("I can't trade that") just talks back, no record.
   const held = !results.length && (plan.steps ?? []).some((s) => s.action === "hold");
-  const outcome = plan.reasoning?.outcome || results.map((x) => x.summary).join("; ") || plan.reply;
-  const reasoning = r.build(outcome);
   const primary = results[0];
-  let url = "";
-
-  if (results.length || held) {
-    await anchor({
-      suiClient: sui, sealClient: seal, walrusClient: walrus, signer: kp, mandateId, accessId,
-      bundle: {
-        version: EVIDENCE_VERSION, mandateId, agent: addr, user: addr, reasoning,
-        actionType: primary?.actionType ?? "hold", target: primary?.target ?? "deepbook", amount: primary?.amount ?? "0",
-        rationale: plan.constraints?.summary || outcome,
-        observed: { understanding: plan.understanding, constraints: plan.constraints, memory, steps: results.map((x) => x.summary) },
-        txDigests: results.map((x) => x.digest).filter(Boolean), timestampMs: Date.now(),
-      },
-    });
-    url = primary?.digest ? `https://suiscan.xyz/${NETWORK}/tx/${primary.digest}` : "";
-  }
-
-  // Remember what just happened, so the next instruction can build on it (sell what we bought, etc).
-  const note = plan.remember || (results.length ? results.map((x) => x.summary).join("; ") : "");
-  if (note) await memory.remember(owner, note);
+  const url = primary?.digest ? `https://suiscan.xyz/${NETWORK}/tx/${primary.digest}` : "";
 
   // Talk back: the agent's own words, plus an honest note about anything that couldn't run.
   const reply = failures.length ? `${plan.reply} One thing: ${failures.join("; ")}.` : plan.reply;
 
-  // Keep this turn in the session, and persist it to Walrus too, so the conversation survives
-  // logout and login, the agent carries its context everywhere.
+  // Update the in-memory conversation now (cheap), then return the reply immediately. The slow part
+  // runs in the background: generating the reasoning trace, anchoring the proof on Walrus, and
+  // writing memory. By the time the user opens Avow to verify, the record is anchored.
   convo.push({ role: "user", text: instruction }, { role: "agent", text: reply });
   conversations.set(mandateId, convo.slice(-12));
-  void memory.rememberTurn(owner, { role: "user", text: instruction });
-  void memory.rememberTurn(owner, { role: "agent", text: reply });
+  const note = plan.remember || (results.length ? results.map((x) => x.summary).join("; ") : "");
+
+  void (async () => {
+    try {
+      if (results.length || held) {
+        // The fallback plan already carries its reasoning; the LLM path generates it here, off the
+        // user-facing path. This trace is what Avow anchors as the proof of how the agent thought.
+        const summaries = results.map((x) => x.summary);
+        const trace = plan.reasoning ?? (hasLLMKey() ? await makeReasoning(instruction, plan, summaries) : undefined);
+        const r = new Reasoning(trace?.goal || `Instruction: "${instruction}"`);
+        for (const s of trace?.steps ?? []) {
+          const d = s.detail ?? undefined;
+          if (s.kind === "observe") r.observe(s.title, d);
+          else if (s.kind === "tool") r.tool(s.title, d);
+          else if (s.kind === "decide") r.decide(s.title, d);
+          else r.think(s.title, d);
+        }
+        const outcome = trace?.outcome || summaries.join("; ") || reply;
+        const reasoning = r.build(outcome);
+        await anchor({
+          suiClient: sui, sealClient: seal, walrusClient: walrus, signer: kp, mandateId, accessId,
+          bundle: {
+            version: EVIDENCE_VERSION, mandateId, agent: addr, user: addr, reasoning,
+            actionType: primary?.actionType ?? "hold", target: primary?.target ?? "deepbook", amount: primary?.amount ?? "0",
+            rationale: plan.constraints?.summary || outcome,
+            observed: { understanding: plan.understanding, constraints: plan.constraints, memory: longTerm, steps: summaries },
+            txDigests: results.map((x) => x.digest).filter(Boolean), timestampMs: Date.now(),
+          },
+        });
+      }
+      if (note) await memory.remember(owner, note);
+      await memory.rememberTurn(owner, { role: "user", text: instruction });
+      await memory.rememberTurn(owner, { role: "agent", text: reply });
+    } catch (e) {
+      console.error("background persist failed:", (e as Error).message);
+    }
+  })();
 
   return {
     mandateId, owner, reply, recalled: longTerm.length + convo.length,

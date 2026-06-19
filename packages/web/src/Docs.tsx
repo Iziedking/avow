@@ -293,6 +293,12 @@ const reasoning = r.build("Paid Netflix 1599");`}
         exact reasoning at the time, sealed, attributable, within the rules, and unaltered since.
         Not "trust my reasoning" but "here is the reasoning I committed to, check it yourself."
       </p>
+      <p>
+        It doesn't matter where the reasoning comes from. A <strong>deterministic</strong> agent
+        records its decision path; an <strong>LLM</strong> agent records the model's chain of
+        thought, the prompt it ran, the data it acted on. Same call either way. A rule engine and
+        a frontier model plug into the exact same layer.
+      </p>
 
       <h3>One agent, many users</h3>
       <p>

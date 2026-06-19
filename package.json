@@ -15,5 +15,8 @@
   },
   "devDependencies": {
     "puppeteer-core": "^25.1.0"
+  },
+  "dependencies": {
+    "@mysten/deepbook-v3": "^1.5.1"
   }
 }

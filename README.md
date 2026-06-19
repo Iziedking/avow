@@ -79,6 +79,11 @@ The whole trace goes into the sealed bundle. On the dashboard a consumer doesn't
 they watch the agent think, step by step, with the guarantee that nothing was edited after the
 fact.
 
+It does not matter where that reasoning comes from. A **deterministic** agent records its
+decision path; an **LLM** agent records the model's chain of thought, the prompt, the data it
+acted on. Same call either way, a rule engine and a frontier model plug into the same layer. Our
+bill payer is deterministic; an LLM agent integrates with the identical `Reasoning` + `anchor()`.
+
 **One agent, many users, perfect isolation.** Real agents are shared, one bill payer serving a
 whole customer base. Avow seals each record to the user it served, using Seal's account-based
 policy: the encryption key-id carries the user's address, and `seal_approve` releases a key only

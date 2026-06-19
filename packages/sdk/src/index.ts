@@ -12,3 +12,4 @@ export * from "./records";
 export * from "./mandate";
 export * from "./anchor";
 export * from "./verify";
+export * from "./reasoning";

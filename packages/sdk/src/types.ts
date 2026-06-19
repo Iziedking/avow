@@ -4,7 +4,33 @@
 // sealed, stored on Walrus, and its hash plus a few public fields are anchored on chain.
 // Strategy detail lives here, off chain, never in the Move event.
 
-export const EVIDENCE_VERSION = 1;
+export const EVIDENCE_VERSION = 2;
+
+/** One step in an agent's reasoning toward an action. The `kind` drives how the dashboard
+ *  renders it, so a consumer can replay exactly how the agent thought. */
+export type ReasoningStepKind = "observe" | "think" | "tool" | "decide";
+
+export interface ReasoningStep {
+  kind: ReasoningStepKind;
+  /** A short headline for the step, e.g. "Checked the biller against your approved list". */
+  title: string;
+  /** The detail: the agent's actual thought, the data it read, the tool result. */
+  detail?: string;
+  /** Optional structured data the step relied on (rates, amounts, args, results). */
+  data?: unknown;
+}
+
+/** The agent's full reasoning toward one action: the goal it was given, the ordered steps it
+ *  took, and the outcome it reached. Sealed to the user it served, so only they (and the owner)
+ *  can replay it, yet its hash is anchored on chain so it cannot be altered after the fact. */
+export interface ReasoningTrace {
+  /** The task the user asked of the agent. */
+  goal: string;
+  /** The ordered steps the agent took to reach its decision. */
+  steps: ReasoningStep[];
+  /** The outcome in one line, e.g. "Paid Netflix 1599" or "Refused: over your limit". */
+  outcome: string;
+}
 
 export interface EvidenceBundle {
   /** Bundle schema version. */
@@ -13,6 +39,11 @@ export interface EvidenceBundle {
   mandateId: string;
   /** The agent address that took the action. */
   agent: string;
+  /** The user this action was taken for. The evidence is sealed to this address, so on a shared
+   *  agent each user decrypts only their own. For a single-user agent this is the owner. */
+  user: string;
+  /** The agent's full reasoning toward this action: goal, ordered steps, outcome. */
+  reasoning?: ReasoningTrace;
   /** What kind of action, matching the on-chain action_type, for example "yield_move". */
   actionType: string;
   /** What the action acted on, matching the on-chain target, for example "navi". */
@@ -47,6 +78,9 @@ export interface AnchoredRecord {
   mandateId: string;
   accessId: string;
   agent: string;
+  /** The user this action was taken for, from the event. The dashboard filters by this so each
+   *  user sees only their own actions; the reasoning behind them stays sealed to that user. */
+  user: string;
   /** Walrus blob id, decoded back to a string. */
   blobId: string;
   /** Hex SHA-256 of the plaintext bundle. */

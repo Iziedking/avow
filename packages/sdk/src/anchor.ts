@@ -35,10 +35,11 @@ export async function anchor(opts: AnchorOptions): Promise<AnchorResult> {
   const plaintext = encodeBundle(bundle);
   const hash = await sha256(plaintext);
 
-  // 2. Build the Seal key id: the access object id bytes, then a random nonce. The
-  //    seal_approve policy requires the access id as the prefix.
+  // 2. Build the Seal key id: [access id][user address][nonce]. The seal_approve policy requires
+  //    the access id as the prefix, then matches the user address so only that user (and the
+  //    owner/auditors) can decrypt. The nonce keeps each bundle's id unique.
   const nonce = randomBytes(NONCE_BYTES);
-  const id = toHex(concat(fromHex(accessId), nonce));
+  const id = toHex(concat(concat(fromHex(accessId), fromHex(bundle.user)), nonce));
 
   // 3. Encrypt to the Seal key servers.
   const { encryptedObject } = await sealClient.encrypt({
@@ -63,6 +64,7 @@ export async function anchor(opts: AnchorOptions): Promise<AnchorResult> {
     arguments: [
       tx.object(mandateId),
       tx.object(accessId),
+      tx.pure.address(bundle.user),
       tx.pure.vector("u8", new TextEncoder().encode(blobId)),
       tx.pure.vector("u8", hash),
       tx.pure.u64(BigInt(bundle.amount)),

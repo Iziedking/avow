@@ -37,6 +37,7 @@ export async function listRecords(
         mandateId: String(j.mandate_id),
         accessId: String(j.access_id),
         agent: String(j.agent),
+        user: String(j.user),
         blobId: toText(j.blob_id),
         evidenceHashHex: toHex(toBytes(j.evidence_hash)),
         amount: String(j.amount),

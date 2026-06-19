@@ -55,8 +55,9 @@ agent, a payment agent, and a trading agent all use the same two calls.
 The strategy detail (the rates seen, the prices, the route, the receipts) lives inside the
 sealed bundle on Walrus. Only the hash and a few headline fields ever touch the Move event.
 
-The reference agents in this repo, a yield router and a shared bill payer, are the proof that
-the layer works end to end, not the product. The product is the proof.
+The reference agents in this repo, a yield router, a shared bill payer, and a live DeepBook
+trading agent, are the proof that the layer works end to end, not the product. The product is
+the proof.
 
 ## The reasoning, sealed to whoever it was for
 
@@ -123,8 +124,8 @@ Two Move modules carry the on-chain half:
 contracts/            Move package: avow::mandate and avow::record, with tests
 packages/
   sdk/                avow-sdk: the anchor() and verify() calls, published to npm
-  agent/              the reference yield agent, a consumer of the SDK
-  web/                the verification dashboard, built as a Walrus Site
+  agent/              reference agents on the SDK: yield router, bill payer, DeepBook trader
+  web/                the verification dashboard and the agent console, built as a Walrus Site
 examples/
   quickstart/         a copy-paste kit to put any agent behind Avow
 deployments/          live package and site ids per network
@@ -179,6 +180,40 @@ It opens on a real agent's track record. Watch the agent work plays the referenc
 decision logic live, and when you connect a wallet and register it as your own agent, the
 finale anchors one genuine proof on the spot, signed by that wallet, which then appears in the
 record for anyone to verify.
+
+### The live DeepBook trading agent, end to end
+
+The headline demo needs no developer setup: a real person claims an agent, funds it, and trades
+from plain English, then verifies the reasoning themselves. Start the agent backend alongside
+the dashboard:
+
+```bash
+npx tsx packages/agent/scripts/agent-server.ts   # the agent backend, signs trades autonomously
+npm -w @avow/web run dev                          # the dashboard and the console
+```
+
+Open `/?console`, connect a wallet, and:
+
+1. **Claim** a personal DeepBook agent: a fresh wallet that signs its own trades with no popups.
+   Because it is built with the Avow SDK, at claim time it grants your wallet read access.
+2. **Fund** it with a little SUI, its trading capital. The platform covers the tiny DEEP and WAL
+   it needs for fees and storage.
+3. **Instruct** it in plain English, for example `swap 1 SUI to stablecoin`. It reads the
+   DeepBook market, checks the mandate, trades for real, and seals its full reasoning.
+4. **Verify** on the Avow home with the same wallet. Your records decrypt for you alone; a
+   different wallet is refused by the Seal key servers.
+
+The console stays deliberately terse, a "done" and a link to the transaction. The full reasoning
+lives on the Avow home, sealed to your wallet. This is Avow for someone with no developer
+knowledge: the wallet is the only identity, and the proof is one click away. The claimed agent
+is remembered per wallet, so the next time you connect it greets you with "your agent is active".
+
+The backend needs a little WAL for storage. Top it up with the helper, which swaps on the Walrus
+exchange (pass `sui` to swap the other way) and never prints your key:
+
+```bash
+npx tsx packages/agent/scripts/get-wal.ts 2      # 2 SUI -> ~2 WAL
+```
 
 ## Roles: owner, agent, auditor
 
@@ -337,6 +372,15 @@ time. MemWal is the off-the-shelf way to put agent memory on Walrus, and you cou
 same bundles with it. Avow adds the three things a money-moving agent actually needs on top of
 storage: an integrity proof bound on chain, authority bounds the record cannot violate, and
 selective disclosure through Seal so the strategy stays private while staying verifiable.
+
+## A note on amounts: MIST
+
+Every amount Avow anchors is stored in its smallest on-chain unit, so the proof is exact to the
+last digit. For SUI that unit is **MIST**: **1 SUI = 1,000,000,000 MIST**, the same way one
+dollar is 100 cents. A one-SUI trade is recorded on chain as `1000000000`. The consumer view
+shows the friendly "1 SUI"; the developer view shows the raw MIST, so what is on screen always
+matches the on-chain value exactly. Amounts in other units follow the same rule (the bill payer
+records US cents, where `1599` is $15.99).
 
 ## On chain
 

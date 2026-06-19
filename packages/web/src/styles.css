@@ -1127,6 +1127,13 @@ input:focus {
   color: var(--text-faint);
 }
 
+/* The developer-only MIST note under a stat: lower-case, no tracking, clearly an aside. */
+.stat-note {
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-dim);
+}
+
 /* The plain-language safety verdict, the first thing a consumer reads. */
 .verdict {
   display: flex;

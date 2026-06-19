@@ -45,6 +45,27 @@ function group(n: string): string {
   return /^\d+$/.test(n) ? n.replace(/\B(?=(\d{3})+(?!\d))/g, ",") : n;
 }
 
+// Each action's on-chain amount is stored in its unit's smallest base: MIST for SUI (where
+// 1 SUI = 1,000,000,000 MIST), cents for USD. unitFor maps an action to how to show that amount.
+function unitFor(actionType: string): { decimals: number; sym: string; pre?: string; base: string } {
+  if (actionType === "swap" || actionType === "trade") return { decimals: 9, sym: "SUI", base: "MIST" };
+  if (actionType.startsWith("payment")) return { decimals: 2, sym: "USD", pre: "$", base: "cents" };
+  return { decimals: 0, sym: "", base: "units" };
+}
+
+// The consumer view shows plain money ("1 SUI", "$15.99"); the developer view shows the raw base
+// units ("1,000,000,000 MIST"). The on-chain value is identical, only the presentation differs.
+function money(raw: string, actionType: string, dev: boolean): string {
+  const u = unitFor(actionType);
+  if (u.decimals === 0) return group(raw);
+  if (dev) return `${group(raw)} ${u.base}`;
+  const v = Number(raw) / 10 ** u.decimals;
+  const s = v.toLocaleString(undefined, { maximumFractionDigits: u.decimals >= 9 ? 4 : 2 });
+  return u.pre ? `${u.pre}${s}` : `${s} ${u.sym}`;
+}
+
+const MIST_NOTE = "MIST is the smallest unit of SUI. 1 SUI = 1,000,000,000 MIST.";
+
 function formatTime(ms: number): string {
   if (!ms) return "";
   return new Date(ms).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
@@ -425,6 +446,10 @@ export function App() {
 
   const moves = shownRecords.length;
   const totalMoved = shownRecords.reduce((sum, r) => sum + BigInt(r.amount || "0"), 0n);
+  // Developer view keeps raw base units (MIST); consumer view shows plain money. A mandate's
+  // records all come from one agent, so they share a unit, the first record sets it.
+  const dev = mode === "build";
+  const unitType = shownRecords[0]?.actionType ?? "swap";
 
   const PER_PAGE = 6;
   const pageCount = Math.max(1, Math.ceil(shownRecords.length / PER_PAGE));
@@ -839,8 +864,13 @@ export function App() {
           <span className="stat-label">actions recorded</span>
         </div>
         <div className="stat">
-          <span className="stat-num tnum">{group(totalMoved.toString())}</span>
-          <span className="stat-label">total moved across all actions</span>
+          <span className="stat-num tnum" title={dev ? MIST_NOTE : undefined}>
+            {money(totalMoved.toString(), unitType, dev)}
+          </span>
+          <span className="stat-label">
+            total moved across all actions
+            {dev && <span className="stat-note"> · shown in MIST ({MIST_NOTE})</span>}
+          </span>
         </div>
       </section>
 
@@ -849,7 +879,7 @@ export function App() {
           <span className="verdict-mark">✓</span>
           <p>
             <strong>Every action your agent took stayed within your limits.</strong> All {moves}{" "}
-            were inside the {group(mandate.perMoveCap)} per-action limit you set. Avow checks that
+            were inside the {money(mandate.perMoveCap.toString(), unitType, dev)} per-action limit you set. Avow checks that
             limit the moment each action is recorded, so one that broke your rules could never have
             been saved here. Open any action below to see exactly what it did, and why, you never
             have to take its word for it.
@@ -907,7 +937,9 @@ export function App() {
                   {r.target && <span className="target">to {r.target}</span>}
                   <span className="amount-wrap">
                     <span className="amount-k">amount moved</span>
-                    <span className="amount tnum">{group(r.amount)}</span>
+                    <span className="amount tnum" title={dev ? MIST_NOTE : undefined}>
+                      {money(r.amount, r.actionType, dev)}
+                    </span>
                   </span>
                   <span
                     className={`status${v.status === "ok" ? " is-verified" : ""}`}
@@ -984,8 +1016,8 @@ export function App() {
                       <div className="reveal-block">
                         <span className="reveal-k">within the limit</span>
                         <p className="reveal-why">
-                          it moved {group(r.amount)}; the limit is {group(mandate.perMoveCap)} per
-                          action.{" "}
+                          it moved {money(r.amount, r.actionType, dev)}; the limit is{" "}
+                          {money(mandate.perMoveCap.toString(), r.actionType, dev)} per action.{" "}
                           {BigInt(r.amount || "0") <= BigInt(mandate.perMoveCap)
                             ? "Inside the limit ✓"
                             : "over the limit"}

@@ -12,18 +12,31 @@ import { createServer, type IncomingMessage } from "node:http";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
-import { DeepBookClient } from "@mysten/deepbook-v3";
 import {
   getSuiClient, getSealClient, getWalrusClient, createMandate, anchor, Reasoning,
   EVIDENCE_VERSION, PACKAGE_ID, NETWORK,
 } from "avow-sdk";
+import { makePlan, hasLLMKey, type Plan, type PlanStep, type Token } from "./brain";
+import { marketSnapshot, swap, placeLimit, deposit, withdraw, cancelAll, createManager, execWithRetry, POOL_PAIRS, COIN_TYPE } from "./deepbook";
 
-const POOL = "SUI_DBUSDC";
-const DEEP_TYPE = "0x36dbef866a1d62bf7328989a10fb2f07d769f4ee587c0de4a0a256e57e0a58a8::deep::DEEP";
+// Load .env ourselves (tsx does not), so ANTHROPIC_API_KEY and friends are picked up.
+function loadDotenv() {
+  if (!existsSync(".env")) return;
+  for (const line of readFileSync(".env", "utf8").split(/\r?\n/)) {
+    const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
+    if (m && !process.env[m[1]]) process.env[m[1]] = m[2].replace(/^["']|["']$/g, "");
+  }
+}
+loadDotenv();
+
 const WAL_TYPE = "0x8270feb7375eee355e64fdb69c50abb6b5f9393a722883c1cf45f8e26048810a::wal::WAL";
 const PORT = Number(process.env.AGENT_PORT ?? 8787);
-const PER_MOVE_CAP = 5_000_000_000n; // 5 SUI per action
-const DAILY_CAP = 50_000_000_000n;
+// On-chain safety ceilings only. The real per-action rule comes from the user's instruction: the
+// brain reads the limit out of the prompt ("swap 1 SUI" -> 1 SUI, "don't spend above 5 USDC" -> 5
+// USDC) and the executor enforces it, so the proof shows the agent obeyed your words. These caps
+// are a generous backstop the mandate can never exceed, not a number you have to set.
+const PER_MOVE_CAP = 1_000_000_000_000n; // 1000 SUI-equivalent
+const DAILY_CAP = 10_000_000_000_000n; // 10000 SUI-equivalent
 
 function loadPlatform(): Ed25519Keypair {
   const key = process.env.AVOW_KEY;
@@ -47,14 +60,14 @@ const walrus = getWalrusClient(sui);
 // keys, so it lives under .firecrawl/ (gitignored); fine for a testnet demo, a real deployment
 // would keep these in a KMS.
 const AGENTS_FILE = ".firecrawl/agents.json";
-type Agent = { kp: Ed25519Keypair; accessId: string; owner: string };
+type Agent = { kp: Ed25519Keypair; accessId: string; owner: string; managerId?: string };
 
 function loadAgents(): Map<string, Agent> {
   const m = new Map<string, Agent>();
   if (!existsSync(AGENTS_FILE)) return m;
   try {
-    const arr = JSON.parse(readFileSync(AGENTS_FILE, "utf8")) as Array<{ mandateId: string; secretKey: string; accessId: string; owner: string }>;
-    for (const a of arr) m.set(a.mandateId, { kp: Ed25519Keypair.fromSecretKey(a.secretKey), accessId: a.accessId, owner: a.owner });
+    const arr = JSON.parse(readFileSync(AGENTS_FILE, "utf8")) as Array<{ mandateId: string; secretKey: string; accessId: string; owner: string; managerId?: string }>;
+    for (const a of arr) m.set(a.mandateId, { kp: Ed25519Keypair.fromSecretKey(a.secretKey), accessId: a.accessId, owner: a.owner, managerId: a.managerId });
   } catch (e) {
     console.error("could not read agents file:", (e as Error).message);
   }
@@ -64,8 +77,18 @@ function loadAgents(): Map<string, Agent> {
 const agents = loadAgents();
 
 function saveAgents() {
-  const arr = [...agents.entries()].map(([mandateId, e]) => ({ mandateId, secretKey: e.kp.getSecretKey(), accessId: e.accessId, owner: e.owner }));
+  const arr = [...agents.entries()].map(([mandateId, e]) => ({ mandateId, secretKey: e.kp.getSecretKey(), accessId: e.accessId, owner: e.owner, managerId: e.managerId }));
   writeFileSync(AGENTS_FILE, JSON.stringify(arr, null, 2));
+}
+
+// A BalanceManager (the trading vault) is created lazily the first time an agent needs one (for
+// limit orders or vault deposits), then remembered.
+async function ensureManager(entry: Agent, addr: string): Promise<string> {
+  if (entry.managerId) return entry.managerId;
+  const id = await createManager(entry.kp, addr);
+  entry.managerId = id;
+  saveAgents();
+  return id;
 }
 
 // The agent most recently claimed by this wallet, if any.
@@ -77,35 +100,24 @@ function agentForOwner(owner: string): { agentAddress: string; mandateId: string
   return found;
 }
 
-// Sign + execute, retrying on transient gas-object version races (the SDK asks to "rebuild").
-async function execWithRetry(build: () => Promise<Transaction>, signer: Ed25519Keypair, tries = 5) {
-  for (let i = 0; i < tries; i++) {
-    try {
-      const res = await sui.signAndExecuteTransaction({ transaction: await build(), signer });
-      await sui.waitForTransaction({ digest: res.digest });
-      return res;
-    } catch (e) {
-      const msg = (e as Error).message;
-      if (i < tries - 1 && /unavailable for consumption|needs to be rebuilt|equivocat|reserved|not available/i.test(msg)) {
-        await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
-        continue;
-      }
-      throw e;
-    }
-  }
-}
-
-// Fund a fresh agent with gas SUI + WAL (storage) in one atomic tx; DEEP it bootstraps from SUI.
+// Fund a fresh agent with gas SUI + WAL (storage) + DEEP (DeepBook taker fees) in one atomic tx,
+// so trading never depends on the live DEEP_SUI pool (which goes dry on testnet). 0.15 DEEP covers
+// several swaps; the platform keeps a DEEP reserve and tops it up when the pools are liquid.
 async function fundPlumbing(agentAddr: string) {
   await execWithRetry(async () => {
     const wal = await sui.getCoins({ owner: platformAddr, coinType: WAL_TYPE });
     if (!wal.data.length) throw new Error("platform has no WAL");
+    const deep = await sui.getCoins({ owner: platformAddr, coinType: COIN_TYPE.DEEP });
+    if (!deep.data.length) throw new Error("platform has no DEEP reserve");
     const tx = new Transaction();
-    const [gas] = tx.splitCoins(tx.gas, [600_000_000]); // 0.6 SUI: gas + DEEP bootstrap
+    const [gas] = tx.splitCoins(tx.gas, [400_000_000]); // 0.4 SUI for gas
     const walPrimary = tx.object(wal.data[0].coinObjectId);
     if (wal.data.length > 1) tx.mergeCoins(walPrimary, wal.data.slice(1).map((c) => tx.object(c.coinObjectId)));
     const [walPart] = tx.splitCoins(walPrimary, [40_000_000]); // 0.04 WAL
-    tx.transferObjects([gas, walPart], agentAddr);
+    const deepPrimary = tx.object(deep.data[0].coinObjectId);
+    if (deep.data.length > 1) tx.mergeCoins(deepPrimary, deep.data.slice(1).map((c) => tx.object(c.coinObjectId)));
+    const [deepPart] = tx.splitCoins(deepPrimary, [150_000]); // 0.15 DEEP (6 dp)
+    tx.transferObjects([gas, walPart, deepPart], agentAddr);
     return tx;
   }, platform);
 }
@@ -138,23 +150,111 @@ async function agentSuiBalance(agentAddr: string): Promise<number> {
   return Number(b.totalBalance) / 1e9;
 }
 
-function interpret(text: string): { amountSui: number } {
-  const m = text.toLowerCase().match(/([\d]+(?:\.[\d]+)?)\s*sui/);
-  return { amountSui: m ? Math.max(1, Math.round(Number(m[1]) * 10) / 10) : 1 };
+// Without an LLM key, a small parser still pulls the rule out of the prompt: "<amount> <from> to
+// <to>". The reasoning it produces is real, just terser; add ANTHROPIC_API_KEY for Claude.
+const SYMBOL: Record<string, Token> = {
+  sui: "SUI", usdc: "DBUSDC", dbusdc: "DBUSDC", stablecoin: "DBUSDC", usd: "DBUSDC", stable: "DBUSDC",
+  usdt: "DBUSDT", dbusdt: "DBUSDT", deep: "DEEP", wal: "WAL", btc: "DBTC", dbtc: "DBTC",
+};
+function fallbackPlan(instruction: string, _state: unknown): Plan {
+  const m = instruction.toLowerCase().match(/([\d.]+)\s*([a-z]+)\s*(?:to|for|into|->|→)\s*([a-z]+)/);
+  const amount = m ? Number(m[1]) || 1 : 1;
+  const from = (m && SYMBOL[m[2]]) || "SUI";
+  const to = (m && SYMBOL[m[3]]) || "DBUSDC";
+  return {
+    understanding: `Swap ${amount} ${from} into ${to}.`,
+    constraints: { summary: `exactly ${amount} ${from}, no more`, maxSpend: amount, spendToken: from },
+    steps: [{ action: "swap", fromToken: from, toToken: to, amount, why: `the instruction asked to swap ${amount} ${from} to ${to}` }],
+    reasoning: {
+      goal: `Instruction: "${instruction}"`,
+      steps: [
+        { kind: "think", title: "Read the instruction", detail: `swap ${amount} ${from} into ${to}` },
+        { kind: "decide", title: "Execute exactly what was asked", detail: `${amount} ${from}, no more` },
+      ],
+      outcome: `Swapped ${amount} ${from} into ${to} on DeepBook.`,
+    },
+  };
 }
 
-async function ensureDeep(db: DeepBookClient, kp: Ed25519Keypair, addr: string) {
-  const bal = await sui.getBalance({ owner: addr, coinType: DEEP_TYPE });
-  if (Number(bal.totalBalance) >= 1_000_000) return;
-  // Buy well above the DEEP_SUI pool's 10-DEEP minSize so it fills even if the price moved.
-  await execWithRetry(async () => {
-    const t = new Transaction();
-    const [b, q, d] = t.add(db.deepBook.swapExactQuoteForBase({ poolKey: "DEEP_SUI", amount: 0.5, deepAmount: 0, minOut: 0, payWithDeep: false }));
-    t.transferObjects([b, q, d], addr);
-    return t;
-  }, kp);
-  const after = await sui.getBalance({ owner: addr, coinType: DEEP_TYPE });
-  if (Number(after.totalBalance) < 1_000_000) throw new Error("could not get DEEP for fees (DeepBook pool too thin right now)");
+interface StepResult {
+  actionType: string;
+  target: string;
+  amount: string; // base units (9 dp), for the on-chain anchor + mandate check
+  digest: string;
+  spent: number; // amount of the constraint token this step consumed
+  summary: string;
+}
+
+const toBase = (n: number) => BigInt(Math.round(n * 1e9)).toString();
+
+// Carry out one planned step, enforcing the user's stated spend limit before it acts.
+async function executeStep(entry: Agent, addr: string, step: PlanStep, constraints: Plan["constraints"], spent: number): Promise<StepResult | null> {
+  const { kp } = entry;
+  switch (step.action) {
+    case "hold":
+      return null;
+
+    case "swap": {
+      if (!step.fromToken || !step.toToken) return null;
+      let amount = step.amount ?? 0;
+      if (amount <= 0) return null;
+      // The user's words are the rule: never spend more of the capped token than they authorized.
+      if (constraints.maxSpend != null && step.fromToken === constraints.spendToken) {
+        amount = Math.min(amount, Math.max(0, constraints.maxSpend - spent));
+      }
+      if (amount <= 0) throw new Error(`your limit of ${constraints.maxSpend} ${constraints.spendToken} is already used up`);
+      const out = await swap(kp, addr, step.fromToken, step.toToken, amount);
+      return {
+        actionType: "swap",
+        target: `deepbook:${step.fromToken}/${step.toToken}`,
+        amount: toBase(amount),
+        digest: out.digest,
+        spent: step.fromToken === constraints.spendToken ? amount : 0,
+        summary: `Swapped ${amount} ${step.fromToken} for ~${out.received.toFixed(4)} ${step.toToken}`,
+      };
+    }
+
+    case "limit_order": {
+      if (!step.pool || !step.side || !step.price || !step.amount) return null;
+      const managerId = await ensureManager(entry, addr);
+      const [base, quote] = POOL_PAIRS[step.pool] ?? [];
+      // A buy rests a bid funded with quote; a sell rests an ask funded with base.
+      const coin = step.side === "buy" ? quote : base;
+      const need = step.side === "buy" ? step.price * step.amount : step.amount;
+      if (coin) await deposit(kp, addr, managerId, coin, need);
+      await placeLimit(kp, addr, managerId, step.pool, step.side, step.price, step.amount);
+      return {
+        actionType: "limit_order",
+        target: `deepbook:${step.pool}`,
+        amount: toBase(step.amount),
+        digest: "",
+        spent: 0,
+        summary: `Placed a ${step.side} limit for ${step.amount} at ${step.price} on ${step.pool}`,
+      };
+    }
+
+    case "deposit": {
+      if (!step.coin || !step.amount) return null;
+      const managerId = await ensureManager(entry, addr);
+      await deposit(kp, addr, managerId, step.coin, step.amount);
+      return { actionType: "deposit", target: `vault:${step.coin}`, amount: toBase(step.amount), digest: "", spent: 0, summary: `Deposited ${step.amount} ${step.coin} into the trading vault` };
+    }
+
+    case "withdraw": {
+      if (!step.coin || !step.amount) return null;
+      const managerId = await ensureManager(entry, addr);
+      await withdraw(kp, addr, managerId, step.coin, step.amount);
+      return { actionType: "withdraw", target: `vault:${step.coin}`, amount: toBase(step.amount), digest: "", spent: 0, summary: `Withdrew ${step.amount} ${step.coin} from the trading vault` };
+    }
+
+    case "cancel_all": {
+      if (!step.pool) return null;
+      const managerId = await ensureManager(entry, addr);
+      await cancelAll(kp, addr, managerId, step.pool);
+      return { actionType: "cancel", target: `deepbook:${step.pool}`, amount: "0", digest: "", spent: 0, summary: `Cancelled all resting orders on ${step.pool}` };
+    }
+  }
+  return null;
 }
 
 async function runInstruction(mandateId: string, instruction: string) {
@@ -162,41 +262,51 @@ async function runInstruction(mandateId: string, instruction: string) {
   if (!entry) throw new Error("unknown agent; claim one first");
   const { kp, accessId, owner } = entry;
   const addr = kp.getPublicKey().toSuiAddress();
-  const db = new DeepBookClient({ client: sui as never, address: addr, network: "testnet" });
-  const { amountSui } = interpret(instruction);
+  if ((await agentSuiBalance(addr)) < 1) throw new Error("fund the agent first: it needs at least ~1 SUI to trade");
 
-  if ((await agentSuiBalance(addr)) < amountSui + 0.2) throw new Error(`fund the agent first: it needs ~${amountSui + 0.2} SUI`);
-  await ensureDeep(db, kp, addr);
+  // Read the live market, then turn the instruction into a plan + reasoning.
+  const state = await marketSnapshot(addr);
+  const plan = hasLLMKey() ? await makePlan(instruction, state) : fallbackPlan(instruction, state);
 
-  const mid = await db.midPrice(POOL);
-  const quote = await db.getQuoteQuantityOut(POOL, amountSui);
+  // Rebuild the model's reasoning as an Avow trace.
+  const r = new Reasoning(plan.reasoning?.goal || `Instruction: "${instruction}"`);
+  for (const s of plan.reasoning?.steps ?? []) {
+    const d = s.detail ?? undefined;
+    if (s.kind === "observe") r.observe(s.title, d);
+    else if (s.kind === "tool") r.tool(s.title, d);
+    else if (s.kind === "decide") r.decide(s.title, d);
+    else r.think(s.title, d);
+  }
 
-  const r = new Reasoning(`Instruction: "${instruction}"`);
-  r.observe("Read the DeepBook SUI/DBUSDC market", `mid price ${mid.toFixed(4)} DBUSDC per SUI`, { mid });
-  r.think("Interpreted the instruction", `swap ${amountSui} SUI to DBUSDC stablecoin`);
-  r.tool("Quoted the swap on DeepBook", `~${quote.quoteOut.toFixed(4)} DBUSDC out`, quote);
-  r.think("Checked the mandate limits", `${amountSui} SUI is within the per-action cap`);
-  r.decide("Execute the swap on DeepBook", `take ~${quote.quoteOut.toFixed(4)} DBUSDC`);
-  const reasoning = r.build(`Swapped ${amountSui} SUI for ~${quote.quoteOut.toFixed(4)} DBUSDC on DeepBook`);
+  // Execute the steps, enforcing the rule taken from the prompt.
+  const results: StepResult[] = [];
+  let spent = 0;
+  for (const step of plan.steps ?? []) {
+    const out = await executeStep(entry, addr, step, plan.constraints, spent);
+    if (out) {
+      results.push(out);
+      spent += out.spent;
+    }
+  }
+  if (!results.length) throw new Error("the agent decided not to act: " + (plan.reasoning?.outcome || plan.understanding));
 
-  const res = await execWithRetry(async () => {
-    const tx = new Transaction();
-    const [b, q, d] = tx.add(db.deepBook.swapExactBaseForQuote({ poolKey: POOL, amount: amountSui, deepAmount: quote.deepRequired, minOut: 0 }));
-    tx.transferObjects([b, q, d], addr);
-    return tx;
-  }, kp);
-  if (!res) throw new Error("swap did not execute");
+  const outcome = plan.reasoning?.outcome || results.map((x) => x.summary).join("; ");
+  const reasoning = r.build(outcome);
 
+  const primary = results[0];
   await anchor({
     suiClient: sui, sealClient: seal, walrusClient: walrus, signer: kp, mandateId, accessId,
     bundle: {
       version: EVIDENCE_VERSION, mandateId, agent: addr, user: addr, reasoning,
-      actionType: "swap", target: "deepbook:SUI/DBUSDC", amount: BigInt(Math.round(amountSui * 1e9)).toString(),
-      rationale: reasoning.outcome, observed: { mid, quote }, txDigests: [res.digest], timestampMs: Date.now(),
+      actionType: primary.actionType, target: primary.target, amount: primary.amount,
+      rationale: plan.constraints?.summary || outcome,
+      observed: { understanding: plan.understanding, constraints: plan.constraints, market: state, steps: results.map((x) => x.summary) },
+      txDigests: results.map((x) => x.digest).filter(Boolean), timestampMs: Date.now(),
     },
   });
 
-  return { mandateId, owner, reasoning, swapDigest: res.digest, swapUrl: `https://suiscan.xyz/${NETWORK}/tx/${res.digest}` };
+  const url = primary.digest ? `https://suiscan.xyz/${NETWORK}/tx/${primary.digest}` : "";
+  return { mandateId, owner, reasoning, understanding: plan.understanding, constraints: plan.constraints, steps: results.map((x) => x.summary), swapUrl: url };
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -218,7 +328,7 @@ const server = createServer(async (req, res) => {
   const send = (code: number, body: unknown) => res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(body));
   try {
     if (req.method === "OPTIONS") return res.writeHead(204).end();
-    if (req.method === "GET" && req.url === "/health") return send(200, { ok: true, platform: platformAddr, claimed: agents.size });
+    if (req.method === "GET" && req.url === "/health") return send(200, { ok: true, platform: platformAddr, claimed: agents.size, llm: hasLLMKey() });
     if (req.method === "POST" && req.url === "/claim") {
       const { owner } = await json(req);
       if (!owner || !String(owner).startsWith("0x")) return send(400, { error: "connect a wallet first" });
@@ -245,6 +355,7 @@ const server = createServer(async (req, res) => {
 server.listen(PORT, () => {
   console.log(`agent server on http://localhost:${PORT}`);
   console.log(`  platform: ${platformAddr}`);
-  console.log(`  POST /claim { owner }  ->  spins up a personal agent that grants the owner`);
-  console.log(`  POST /agent { mandateId, instruction }`);
+  console.log(`  brain:    ${hasLLMKey() ? "Claude (" + (process.env.AVOW_LLM_MODEL ?? "claude-haiku-4-5") + ")" : "rule-based (set ANTHROPIC_API_KEY for Claude)"}`);
+  console.log(`  POST /claim { owner }   ->  spins up a personal agent that grants the owner`);
+  console.log(`  POST /agent { mandateId, instruction }  ->  plans, trades on DeepBook, proves it`);
 });

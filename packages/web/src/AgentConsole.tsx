@@ -124,10 +124,10 @@ export function AgentConsole() {
     add("sys", "agent reading the market and reasoning…");
     try {
       const out = await api("/agent", { mandateId: agent.mandate, instruction: text });
-      if (out.error) add("err", `the agent refused: ${out.error}`);
+      if (out.error) add("err", `the agent stopped: ${out.error}`);
       else {
-        add("outcome", `✓ ${out.reasoning.outcome}`);
-        add("proof", "on-chain ↗ view on SuiScan", out.swapUrl);
+        for (const s of (out.steps as string[] | undefined) ?? ["done"]) add("outcome", `✓ ${s}`);
+        if (out.swapUrl) add("proof", "on-chain ↗ view on SuiScan", out.swapUrl);
         add("sys", "done. verify the full reasoning on Avow ▾");
       }
     } catch {

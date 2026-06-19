@@ -24,7 +24,7 @@ async function main() {
   console.log("funded agent 1.5 SUI (settled)");
   const out: any = await post("/agent", { mandateId: claimed.mandateId, instruction: "swap 1 SUI to stablecoin" });
   if (out.error) return console.log("agent error:", out.error);
-  console.log("traded:", out.swapUrl, "->", out.reasoning?.outcome);
+  console.log("agent steps:", JSON.stringify(out.steps), "url:", out.swapUrl);
   await new Promise(r=>setTimeout(r,8000));
   const recs = await listRecords(sui, claimed.mandateId);
   console.log("\n=== identity verifies (granted at claim) ===  records:", recs.length);

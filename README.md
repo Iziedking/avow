@@ -4,14 +4,21 @@
 
 # Avow
 
-**Build agents with the Avow SDK so their actions are stored on Walrus, encrypted with Seal, and
-become verifiable and provable on Sui.**
+**Proof, not trust.**
 
-Proof, not trust. Your agent does whatever it does. After each action it calls `anchor()`, and
-Avow turns that action into a private, tamper-proof record: the evidence is sealed with Seal,
-stored on Walrus, and bound to an on-chain anchor that the agent's own mandate had to approve.
-Anyone the owner authorizes can later call `verify()` and confirm the record is real,
-unaltered, and within the limits that were set.
+AI agents are starting to move real money, paying bills, rebalancing savings, settling invoices.
+Every one of them asks for the same thing: trust. Trust that it paid the right merchant, trust
+that it stayed inside your limit, trust that the thinking behind the decision was sound. You get
+an outcome and a shrug.
+
+Avow replaces the shrug with proof. Build your agent with the Avow SDK and every action it
+takes, **and the full reasoning behind it**, is sealed with Seal, stored on Walrus, and anchored
+on Sui. Anyone you authorize can later replay exactly what the agent did, *why* it did it, and
+confirm it never broke the rules you set. The strategy stays private; the proof is public.
+
+And when one agent serves many people, each person sees only their own. Per-user encryption,
+enforced on chain, means your agent's reasoning for you is yours alone, not a promise, a key
+nobody else holds.
 
 Built for Sui Overflow 2026, Walrus track.
 
@@ -28,7 +35,8 @@ moves honestly or skipped the ones that looked bad. And putting all of that on c
 clear would leak the agent's strategy to everyone.
 
 So the gap is specific: there is no way to prove, tamper-evidently and privately, what a
-money-moving agent did and whether its track record is real.
+money-moving agent did, *why* it did it, and whether its track record is real, and no way to do
+that for an agent shared by many users without leaking one person's history to everyone else.
 
 ## What Avow is
 
@@ -47,8 +55,37 @@ agent, a payment agent, and a trading agent all use the same two calls.
 The strategy detail (the rates seen, the prices, the route, the receipts) lives inside the
 sealed bundle on Walrus. Only the hash and a few headline fields ever touch the Move event.
 
-The reference integration in this repo is a simple stablecoin yield agent. It is the proof
-that the layer works end to end, not the product. The product is the proof.
+The reference agents in this repo, a yield router and a shared bill payer, are the proof that
+the layer works end to end, not the product. The product is the proof.
+
+## The reasoning, sealed to whoever it was for
+
+An action without its reasoning is half a story. Avow captures the whole story.
+
+As your agent works, it records its reasoning as it goes: what it observed, what it weighed,
+which tools it ran, and the decision it landed on. The SDK's `Reasoning` builder keeps this to
+one fluent line per step:
+
+```ts
+const r = new Reasoning("Pay this month's Netflix bill if it's safe");
+r.observe("Read the bill", "Netflix billed 1599, the usual is 1599", { billed: 1599 });
+r.tool("Checked the approved billers", "Netflix is on the approved list");
+r.think("Checked the per-payment limit", "1599 is within the 5000 limit");
+r.decide("Approved and paid", "due, approved, matches the usual, within the limit");
+const reasoning = r.build("Paid Netflix 1599");
+```
+
+The whole trace goes into the sealed bundle. On the dashboard a consumer doesn't read a number,
+they watch the agent think, step by step, with the guarantee that nothing was edited after the
+fact.
+
+**One agent, many users, perfect isolation.** Real agents are shared, one bill payer serving a
+whole customer base. Avow seals each record to the user it served, using Seal's account-based
+policy: the encryption key-id carries the user's address, and `seal_approve` releases a key only
+to that user, or to the owner, for support. No per-user setup, no allowlist to maintain, a
+user's address *is* their key. Alice can replay every decision the agent made for her; she
+physically cannot open Bob's, the key servers refuse her. We tested it live: verifying a shared
+agent as Alice returns her records and is denied the rest.
 
 ## How it works
 
@@ -70,9 +107,10 @@ Two Move modules carry the on-chain half:
 
 - `avow::mandate` declares the agent's authority: a single agent address, a per-action cap, a
   per-epoch cap, an optional allowlist of targets, an expiry, and a revoke. It holds no funds.
-- `avow::record` anchors each action after the mandate check passes, and gates Seal
-  decryption through `seal_approve`, which only releases a key to an address the owner added
-  as a reader.
+- `avow::record` anchors each action, tagged with the user it served, after the mandate check
+  passes, and gates Seal decryption through `seal_approve`. It releases a key to a global reader
+  the owner added (owner or auditor), or to the individual user a record was sealed to, and no
+  one else, which is what makes one shared agent safe for many users.
 
 ## Repository
 
@@ -115,8 +153,10 @@ funds to the best risk-adjusted yield and provably ignores pools that are too ri
 npx tsx packages/agent/scripts/experiment.ts
 ```
 
-The consumer one pays bills, and provably refuses overcharges, unknown billers, and anything over
-your limit, recording every decision (paid and refused) with its reasoning:
+The consumer one is a shared bill payer serving two users, Alice and Bob. For each it pays the
+safe bills and provably refuses overcharges, unknown billers, and anything over the limit,
+recording every decision with its full reasoning and sealing each to the user it served, so on
+the dashboard each user only ever sees their own:
 
 ```bash
 npx tsx packages/agent/scripts/bills.ts
@@ -146,20 +186,30 @@ Three roles, which can be one wallet (the quickest start) or three:
 - **Auditor** is any address the owner grants read access, so a third party can verify the
   record without being trusted with anything else.
 
-The wallet is only identity. The reasoning is whatever your code puts in the evidence bundle
-(`rationale`, `observed`, `txDigests`). For an LLM agent, you put the model's prompt and output
-in `rationale` and the data it saw in `observed`. Avow then proves the agent committed to that
-reasoning, sealed, attributable, within the rules, and unaltered since, not that the model
-"truly thought" it. That honesty is the stronger claim.
+The wallet is only identity. The reasoning is whatever your code puts in the evidence bundle:
+the structured `reasoning` trace (the ordered steps the agent took), plus `observed`,
+`rationale`, and `txDigests`. For an LLM agent, each step of the model's chain of thought becomes
+a step in the trace, and the data it saw goes in `observed`. Avow then proves the agent committed
+to that reasoning, sealed, attributable to a specific user, within the rules, and unaltered
+since, not that the model "truly thought" it. That honesty is the stronger claim.
 
 ## Integrate your own agent
 
 After your agent does its work, the whole integration is one call:
 
 ```ts
-import { getSuiClient, getSealClient, getWalrusClient, anchor, EVIDENCE_VERSION } from "avow-sdk";
+import {
+  getSuiClient, getSealClient, getWalrusClient, anchor, Reasoning, EVIDENCE_VERSION,
+} from "avow-sdk";
 
 const sui = getSuiClient();
+
+// Capture the reasoning as the agent works.
+const reasoning = new Reasoning("Pay the invoice the user approved")
+  .observe("Read the invoice", "Stripe invoice inv_42 for 1500", { invoiceId: "inv_42" })
+  .decide("Approved and paid", "the user pre-approved this invoice")
+  .build("Paid Stripe 1500");
+
 const proof = await anchor({
   suiClient: sui,
   sealClient: getSealClient(sui),
@@ -171,6 +221,8 @@ const proof = await anchor({
     version: EVIDENCE_VERSION,
     mandateId,
     agent: agentAddress,
+    user: customerAddress, // this record is sealed to this user; on a shared agent, only they can read it
+    reasoning,
     actionType: "payment",
     target: "stripe",
     amount: "1500",
@@ -224,7 +276,6 @@ avow create-mandate --agent 0xAGENT --per-move 1000000 --daily 10000000
 ```
 
 It prints `AVOW_MANDATE_ID`, `AVOW_ACCESS_ID`, and an admin cap. Keep the cap safe; it is what
-
 lets you grant auditors later. Export the first two for the commands below:
 
 ```bash
@@ -284,10 +335,10 @@ selective disclosure through Seal so the strategy stays private while staying ve
 
 ## On chain
 
-Testnet, recorded in [`deployments/testnet.json`](deployments/testnet.json):
+Testnet:
 
-- Package: `0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e`
-- Reference mandate: `0x0f893eb746e08ae348d1389f3c633b282966218e784e8f142bf0acaa60184c11`
+- Package: `0xace239ce0defd77ce0c4e570233b37a86ac53377a38ae59749feda3ec9715667`
+- Shared bill payer mandate: `0x80d5da99a1d51ed92fbc9cee907ce9b7c7c666b54751ec527108481984a7f32c`
 
 
 ## License

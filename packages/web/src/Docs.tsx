@@ -171,10 +171,12 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
         and become verifiable and provable on Sui.
       </p>
       <p>
-        Money-moving AI agents ask you to trust their numbers. Avow makes them prove them. After
-        an agent acts, it seals the evidence and stamps a tamper-proof anchor on chain. Anyone the
-        owner authorizes can later decrypt that evidence, recompute its fingerprint, and confirm
-        the action was real and inside the rules. Two calls carry the whole product.
+        Money-moving AI agents ask you to trust their numbers and their judgment. Avow makes them
+        prove both. After an agent acts, it seals the evidence, the action <em>and the full
+        reasoning behind it</em>, and stamps a tamper-proof anchor on chain. Anyone the agent
+        served, or an auditor the owner authorizes, can later decrypt it, recompute its
+        fingerprint, and confirm the action was real, inside the rules, and exactly as reasoned.
+        Two calls carry the whole product.
       </p>
 
       <div className="doc-two">
@@ -182,9 +184,9 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
           <span className="doc-card-k">on the way in</span>
           <h3>anchor(action)</h3>
           <p>
-            Hashes the evidence, encrypts it with Seal, stores the ciphertext on Walrus, and
-            records the anchor on Sui through the mandate check. An action that breaks the
-            mandate cannot anchor at all.
+            Hashes the evidence, the action and its reasoning, sealed to the user it served,
+            encrypts it with Seal, stores it on Walrus, and records the anchor on Sui through the
+            mandate check. An action that breaks the mandate cannot anchor at all.
           </p>
         </div>
         <div className="doc-card">
@@ -236,20 +238,37 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
         and reads too. That is the quickest start, just know the roles are really separate.
       </p>
 
-      <h3>Where the reasoning comes from</h3>
+      <h3>The reasoning, captured as it happens</h3>
       <p>
-        Avow does not read your agent's mind. The wallet is only identity. The reasoning is
-        whatever your code puts in the evidence bundle: <code>rationale</code> for the why,{" "}
-        <code>observed</code> for the data it saw, <code>txDigests</code> for the real
-        transactions. For an LLM agent, you drop the model's prompt and output into{" "}
-        <code>rationale</code> and the data it was fed into <code>observed</code>, then call{" "}
-        <code>anchor()</code>. Avow seals and proves exactly what you record.
+        An action without its reasoning is half a story. As your agent works, it records its
+        thinking step by step with the <code>Reasoning</code> builder, what it observed, what it
+        weighed, the tools it ran, the decision it reached:
       </p>
+      <CodeBlock
+        caption="reasoning.ts"
+        code={`const r = new Reasoning("Pay this month's Netflix bill if it's safe");
+r.observe("Read the bill", "Netflix billed 1599, the usual is 1599");
+r.tool("Checked the approved billers", "Netflix is on the list");
+r.think("Checked the per-payment limit", "1599 is within the 5000 limit");
+r.decide("Approved and paid", "due, approved, matches the usual, within limit");
+const reasoning = r.build("Paid Netflix 1599");`}
+      />
       <p>
-        So it proves the agent <strong>committed</strong> to this reasoning at the time, sealed,
-        attributable, within the rules, and provably unaltered since. It does not prove the model
-        "truly thought" it. That is the honest and the stronger claim: not "trust my reasoning"
-        but "here is the reasoning I committed to, check it yourself."
+        That whole trace goes into the sealed bundle, so a consumer doesn't read a number, they
+        watch the agent think, with the guarantee that nothing was edited after the fact. Avow
+        does not read your agent's mind; it proves the agent <strong>committed</strong> to this
+        exact reasoning at the time, sealed, attributable, within the rules, and unaltered since.
+        Not "trust my reasoning" but "here is the reasoning I committed to, check it yourself."
+      </p>
+
+      <h3>One agent, many users</h3>
+      <p>
+        Real agents are shared, one bill payer serving a whole customer base. Avow seals every
+        record to the user it served, using Seal's account-based policy: the encryption key
+        carries the user's address, so a consumer can replay every decision the agent made{" "}
+        <em>for them</em>, and physically cannot open anyone else's. The key servers refuse. No
+        per-user setup and no allowlist to maintain, a user's address is their key. The owner can
+        still see everything, for support.
       </p>
 
       <h3>The flow</h3>
@@ -317,10 +336,16 @@ function Sdk() {
         caption="anchor.ts"
         code={`import {
   getSuiClient, getSealClient, getWalrusClient,
-  anchor, EVIDENCE_VERSION,
+  anchor, Reasoning, EVIDENCE_VERSION,
 } from "avow-sdk";
 
 const sui = getSuiClient();
+
+// capture the reasoning as the agent works
+const reasoning = new Reasoning("Pay the invoice the user approved")
+  .observe("Read the invoice", "Stripe inv_42 for 1500")
+  .decide("Approved and paid", "the user pre-approved this invoice")
+  .build("Paid Stripe 1500");
 
 const proof = await anchor({
   suiClient: sui,
@@ -333,6 +358,8 @@ const proof = await anchor({
     version: EVIDENCE_VERSION,
     mandateId,
     agent: agentAddress,
+    user: customerAddress,     // sealed to this user; on a shared agent only they can read it
+    reasoning,                 // the full reasoning trace
     actionType: "payment",     // what it did
     target: "stripe",          // who it acted on
     amount: "1500",            // how much it moved

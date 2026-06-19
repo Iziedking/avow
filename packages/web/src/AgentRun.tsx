@@ -9,6 +9,7 @@ import { beep } from "./beep";
 import { anchorLive, type SignAndExecute, type LiveAction } from "./anchorLive";
 import { verifyRecord, type SignPersonalMessage } from "./verify";
 import { describeObserved } from "./reveal";
+import { ReasoningFlow, type ReasoningTrace } from "./Reasoning";
 import type { AnchoredRecord } from "./records";
 import { SUISCAN } from "./config";
 
@@ -54,6 +55,7 @@ function fmt(n: string): string {
 export function AgentRun(props: AgentRunProps) {
   const [lines, setLines] = useState<Line[]>([]);
   const [busy, setBusy] = useState(false);
+  const [reasoning, setReasoning] = useState<ReasoningTrace | null>(null);
   const seq = useRef(0);
 
   const push = useCallback((line: Line) => {
@@ -68,6 +70,7 @@ export function AgentRun(props: AgentRunProps) {
     const id = ++seq.current;
     setBusy(true);
     setLines([]);
+    setReasoning(null);
     const alive = () => seq.current === id;
     const add = (line: Line) => {
       if (alive()) {
@@ -92,11 +95,17 @@ export function AgentRun(props: AgentRunProps) {
             kind: within ? "data" : "hold",
           });
         }
-        add({ text: `unsealed, this is what the agent actually recorded:`, kind: "head" });
-        for (const line of describeObserved(out.bundle?.observed)) {
-          add({ text: `saw   ${line}`, kind: "data" });
+        const trace = out.bundle?.reasoning as ReasoningTrace | undefined;
+        if (trace) {
+          add({ text: `unsealed. the agent's full reasoning is below.`, kind: "head" });
+          if (alive()) setReasoning(trace);
+        } else {
+          add({ text: `unsealed, this is what the agent actually recorded:`, kind: "head" });
+          for (const line of describeObserved(out.bundle?.observed)) {
+            add({ text: `saw   ${line}`, kind: "data" });
+          }
+          if (out.rationale) add({ text: `why   ${out.rationale}`, kind: "move" });
         }
-        if (out.rationale) add({ text: `why   ${out.rationale}`, kind: "move" });
       } else {
         add({
           text: `the recomputed fingerprint did not match. this record does not verify.`,
@@ -197,6 +206,13 @@ export function AgentRun(props: AgentRunProps) {
         )}
         {busy && <span className="run-cursor" />}
       </div>
+
+      {reasoning && (
+        <div className="run-reasoning">
+          <span className="reveal-k">how it reasoned</span>
+          <ReasoningFlow trace={reasoning} />
+        </div>
+      )}
 
       {props.showAnchor &&
         (props.canAnchor ? (

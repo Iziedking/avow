@@ -179,6 +179,39 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
         Two calls carry the whole product.
       </p>
 
+      <h3>Why this matters</h3>
+      <p>
+        Agents are turning us from operators into supervisors: they act on our behalf, often
+        without asking first. a16z crypto puts the stakes plainly, the moment an agent acts for
+        you, <em>"user agency means being able to set boundaries and verify what's done on your
+        behalf, even if you're not the one clicking 'sign.'"</em> Without that, delegation is
+        just blind trust at scale.
+      </p>
+      <blockquote className="doc-quote">
+        <p>
+          "Public ledgers give every transaction a receipt that anyone can audit." Scoped
+          delegation frameworks "let users define, at the smart contract level, what an agent can
+          and cannot do."
+        </p>
+        <cite>
+          a16z crypto,{" "}
+          <a
+            href="https://a16zcrypto.com/posts/article/5-ways-blockchains-help-ai-agents/"
+            target="_blank"
+            rel="noreferrer"
+          >
+            The missing infrastructure for AI agents
+          </a>
+        </cite>
+      </blockquote>
+      <p>
+        That is the exact shape of Avow. The <strong>mandate</strong> is the scoped delegation,
+        the limits you set on chain. <strong>anchor()</strong> and <strong>verify()</strong> are
+        the auditable receipt, proof of what the agent did and why, not a promise. And because
+        every record is sealed to the user it served, your agent's reasoning for you stays yours.
+        Trust hardcoded into the architecture, not asked for.
+      </p>
+
       <div className="doc-two">
         <div className="doc-card">
           <span className="doc-card-k">on the way in</span>

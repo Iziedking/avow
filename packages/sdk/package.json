@@ -1,7 +1,7 @@
 {
   "name": "avow-sdk",
-  "version": "0.2.0",
-  "description": "Anchor an AI agent's actions as private, verifiable evidence on Walrus and Seal, and verify any anchored record. The trust layer any money-moving agent on Sui can plug into.",
+  "version": "0.3.0",
+  "description": "Give an AI agent a portable, verifiable brain on Walrus: anchor its actions as private, verifiable evidence (Walrus + Seal + Sui), and give it memory it carries everywhere and recalls across sessions. The trust and memory layer any agent on Sui can plug into.",
   "license": "Apache-2.0",
   "type": "module",
   "main": "./dist/index.js",
@@ -39,6 +39,8 @@
     "ai-agents",
     "verifiable",
     "trust-layer",
+    "agent-memory",
+    "memwal",
     "provenance",
     "agentic-payments"
   ],
@@ -49,6 +51,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@mysten-incubation/memwal": "^0.0.7",
     "@mysten/seal": "1.1.3",
     "@mysten/sui": "2.17.0",
     "@mysten/walrus": "1.1.7"

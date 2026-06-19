@@ -50,7 +50,8 @@ export interface MarketState {
   balances: Record<string, number>; // token -> human amount the agent holds
   prices: Record<string, number>; // poolKey -> mid price (quote per base)
   pools: string[]; // tradeable pools
-  memory: string[]; // what the agent remembers doing for this user (Walrus via MemWal)
+  memory: string[]; // long-term: what the agent remembers doing for this user (Walrus via MemWal)
+  conversation: { role: "user" | "agent"; text: string }[]; // this session's recent back-and-forth
 }
 
 const PLAN_SCHEMA = {
@@ -157,14 +158,22 @@ function buildUserMessage(instruction: string, state: MarketState): string {
     .map(([p, v]) => `${p} mid ${v}`)
     .join(", ");
   const mem = state.memory.length ? state.memory.map((m) => `- ${m}`).join("\n") : "(nothing yet)";
+  const convo = state.conversation.length
+    ? state.conversation.map((t) => `${t.role === "user" ? "user" : "you"}: ${t.text}`).join("\n")
+    : "(this is the first message)";
   return [
-    `Instruction: "${instruction}"`,
+    `This session's conversation so far:`,
+    convo,
+    ``,
+    `New message from the user: "${instruction}"`,
+    `If it is a short follow-up ("use 0.5", "do it", "yes, that one", "no, WAL not DEEP"), resolve it`,
+    `against the conversation above and act, do not ask what they mean when it is clear from context.`,
     ``,
     `Your wallet balances: ${bal || "(none)"}`,
     `DeepBook prices: ${px || "(none read)"}`,
     `Tradeable pools: ${state.pools.join(", ")}`,
     ``,
-    `What you remember doing for this user:`,
+    `What you remember from earlier sessions (long-term memory):`,
     mem,
     ``,
     `Produce the plan. Honor the instruction exactly, stay within any limit it states, and use your`,

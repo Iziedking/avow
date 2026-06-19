@@ -806,8 +806,24 @@ button {
   word-break: break-word;
 }
 
+/* Your message: a clear turn boundary, dim prompt, bright text so the chat reads cleanly. */
 .ac-cmd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 9px;
+  margin-top: 20px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(95, 208, 138, 0.1);
+}
+.ac-cmd-ps {
+  flex: 0 0 auto;
+  color: var(--green);
+  opacity: 0.45;
+}
+.ac-cmd-text {
   color: #fff;
+  font-weight: 500;
 }
 .ac-sys {
   color: var(--text-dim);

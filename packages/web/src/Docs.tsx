@@ -345,19 +345,29 @@ authorized reader  ->  verify()
         readable JSON, and only through <code>verify()</code>. Everyone else sees noise.
       </p>
 
-      <h3>Memory the agent reads and builds on</h3>
+      <h3>Memory the agent carries everywhere</h3>
       <p>
-        The same record is also the agent's <strong>memory</strong>. Before it acts, an Avow agent
-        reads its own history back from Walrus, so it tracks state across sessions instead of
-        starting blank each time. A trading agent remembers it opened a position at one price, and
-        when you later say "sell it for profit", it recalls that entry, checks the market, and only
-        sells if it is genuinely up. Long-running, stateful behaviour from durable, portable data,
-        the foundation the Walrus track is about.
+        The same record is also the agent's <strong>memory</strong>, and it ships in the SDK. One
+        call, <code>createMemory()</code>, gives the agent <code>remember()</code> and{" "}
+        <code>recall()</code> on Walrus. Before it acts it reads its own history back, so it tracks
+        state across sessions instead of starting blank: a trading agent remembers it opened a
+        position at one price, and when you later say "sell it for profit", it recalls that entry,
+        checks the market, and only sells if it is genuinely up. Log out, log back in, switch
+        machines, the context comes with it.
       </p>
+      <CodeBlock
+        caption="memory.ts"
+        code={`import { createMemory } from "avow-sdk";
+
+const memory = createMemory();           // reads MEMWAL_* from the environment
+
+await memory.remember(user, "Bought 0.3 WAL at 0.71 SUI.");
+const context = await memory.recall(user, "what's my WAL position?");`}
+      />
       <p className="doc-muted">
-        Working memory runs on <strong>MemWal (Walrus Memory)</strong>, scoped per user; the proof
-        of each action runs on our Seal-anchored evidence log. MemWal for what the agent remembers,
-        Avow for proving what it did, both on Walrus, neither locked to this app.
+        Memory runs on <strong>MemWal (Walrus Memory)</strong>, scoped per user; proof runs on our
+        Seal-anchored evidence log. MemWal for what the agent remembers, Avow for proving what it
+        did, both come from <code>avow-sdk</code>, both live on Walrus, neither locked to this app.
       </p>
 
       <div className="doc-jump">
@@ -486,8 +496,9 @@ function Sdk() {
       <h2>SDK</h2>
       <p>
         <code>avow-sdk</code> is the programmatic way in. Your agent does whatever it does, then
-        calls <code>anchor()</code> once. An auditor service calls <code>verify()</code>. Both are
-        plain TypeScript.
+        calls <code>anchor()</code> once. An auditor service calls <code>verify()</code>. And{" "}
+        <code>createMemory()</code> gives the agent a portable brain on Walrus, <code>remember()</code>{" "}
+        and <code>recall()</code> across sessions. Proof and memory, one SDK, plain TypeScript.
       </p>
 
       <CodeBlock caption="install" code={`npm i avow-sdk`} />

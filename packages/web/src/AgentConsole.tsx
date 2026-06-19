@@ -83,7 +83,7 @@ export function AgentConsole() {
     if (!account || busy) return;
     setBusy(true);
     setLines([]);
-    add("cmd", `${short(account.address)}@avow:~$ claim a deepbook agent`);
+    add("cmd", "claim a deepbook agent");
     add("sys", "spinning up your personal agent and granting your wallet…");
     try {
       const out = await api("/claim", { owner: account.address });
@@ -119,8 +119,9 @@ export function AgentConsole() {
   async function run() {
     const text = instruction.trim();
     if (!text || busy || !agent) return;
+    setInstruction(""); // clear the input the moment you send, the message moves into the log
     setBusy(true);
-    add("cmd", `${short(account!.address)}@avow:~$ ${text}`);
+    add("cmd", text); // your message (the prompt prefix is drawn in the render)
     add("sys", "agent recalling its memory and reading the market…");
     try {
       const out = await api("/agent", { mandateId: agent.mandate, instruction: text });
@@ -138,7 +139,6 @@ export function AgentConsole() {
       add("err", "agent unreachable. is the backend running?");
     } finally {
       setBusy(false);
-      setInstruction("");
     }
   }
 
@@ -180,6 +180,11 @@ export function AgentConsole() {
               <div key={i} className="ac-memlane">
                 <span className="ml-track" aria-hidden />
                 <span className="ml-label">{l.text}</span>
+              </div>
+            ) : l.kind === "cmd" ? (
+              <div key={i} className="ac-line ac-cmd">
+                <span className="ac-cmd-ps">{account ? short(account.address) : "you"}@avow:~$</span>
+                <span className="ac-cmd-text">{l.text}</span>
               </div>
             ) : (
               <div key={i} className={`ac-line ac-${l.kind}`}>

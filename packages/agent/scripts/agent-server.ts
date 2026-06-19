@@ -13,12 +13,11 @@ import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import {
-  getSuiClient, getSealClient, getWalrusClient, createMandate, anchor, Reasoning,
+  getSuiClient, getSealClient, getWalrusClient, createMandate, anchor, Reasoning, createMemory,
   EVIDENCE_VERSION, PACKAGE_ID, NETWORK,
 } from "avow-sdk";
 import { makePlan, hasLLMKey, type Plan, type PlanStep, type Token } from "./brain";
-import { marketSnapshot, swap, placeLimit, deposit, withdraw, cancelAll, createManager, execWithRetry, POOL_PAIRS, COIN_TYPE } from "./deepbook";
-import { recall, remember, hasMemory } from "./memory";
+import { marketSnapshot, swap, placeLimit, deposit, withdraw, cancelAll, createManager, execWithRetry, balance, POOL_PAIRS, COIN_TYPE } from "./deepbook";
 
 // Load .env ourselves (tsx does not), so ANTHROPIC_API_KEY and friends are picked up.
 function loadDotenv() {
@@ -55,6 +54,8 @@ const platformAddr = platform.getPublicKey().toSuiAddress();
 const sui = getSuiClient();
 const seal = getSealClient(sui);
 const walrus = getWalrusClient(sui);
+// The agent's portable brain on Walrus (reads MEMWAL_* from the environment).
+const memory = createMemory();
 
 // Claimed agents: mandateId -> { keypair, accessId, owner }. Persisted to disk so a returning
 // wallet finds its agent (and its signer survives a server restart). The file holds agent secret
@@ -76,6 +77,10 @@ function loadAgents(): Map<string, Agent> {
 }
 
 const agents = loadAgents();
+
+// This session's back-and-forth per mandate, so the agent understands follow-ups like "use 0.5".
+// In-memory only (short-term); long-term memory is MemWal. Trimmed to the recent turns.
+const conversations = new Map<string, { role: "user" | "agent"; text: string }[]>();
 
 function saveAgents() {
   const arr = [...agents.entries()].map(([mandateId, e]) => ({ mandateId, secretKey: e.kp.getSecretKey(), accessId: e.accessId, owner: e.owner, managerId: e.managerId }));
@@ -206,6 +211,9 @@ async function executeStep(entry: Agent, addr: string, step: PlanStep, constrain
         amount = Math.min(amount, Math.max(0, constraints.maxSpend - spent));
       }
       if (amount <= 0) throw new Error(`your limit of ${constraints.maxSpend} ${constraints.spendToken} is already used up`);
+      const have = await balance(addr, step.fromToken);
+      const gasBuffer = step.fromToken === "SUI" ? 0.7 : 0; // leave room for gas + the DEEP bootstrap
+      if (have < amount + gasBuffer) throw new Error(`not enough ${step.fromToken} to swap ${amount} (you have ${have.toFixed(2)}); fund the agent a little more`);
       const out = await swap(kp, addr, step.fromToken, step.toToken, amount);
       return {
         actionType: "swap",
@@ -265,12 +273,20 @@ async function runInstruction(mandateId: string, instruction: string) {
   if (!entry) throw new Error("unknown agent; claim one first");
   const { kp, accessId, owner } = entry;
   const addr = kp.getPublicKey().toSuiAddress();
-  if ((await agentSuiBalance(addr)) < 1) throw new Error("fund the agent first: it needs at least ~1 SUI to trade");
 
-  // Read the live market AND recall what the agent has done for this user, then plan over both.
+  // Read the live market and recall long-term memory from Walrus.
   const snap = await marketSnapshot(addr);
-  const memory = await recall(owner, instruction);
-  const state = { ...snap, memory };
+  const longTerm = await memory.recall(owner, instruction);
+
+  // Carry this session's conversation so the agent understands follow-ups ("use 0.5"). On a fresh
+  // start (a new login, a server restart), recover it from Walrus, the agent picks the thread up.
+  let convo = conversations.get(mandateId);
+  if (!convo) {
+    convo = await memory.recallConversation(owner);
+    conversations.set(mandateId, convo);
+  }
+
+  const state = { ...snap, memory: longTerm, conversation: convo.slice(-8) };
   const plan = hasLLMKey() ? await makePlan(instruction, state) : fallbackPlan(instruction, state);
 
   // Rebuild the model's reasoning as an Avow trace.
@@ -323,13 +339,20 @@ async function runInstruction(mandateId: string, instruction: string) {
 
   // Remember what just happened, so the next instruction can build on it (sell what we bought, etc).
   const note = plan.remember || (results.length ? results.map((x) => x.summary).join("; ") : "");
-  if (note) await remember(owner, note);
+  if (note) await memory.remember(owner, note);
 
   // Talk back: the agent's own words, plus an honest note about anything that couldn't run.
   const reply = failures.length ? `${plan.reply} One thing: ${failures.join("; ")}.` : plan.reply;
 
+  // Keep this turn in the session, and persist it to Walrus too, so the conversation survives
+  // logout and login, the agent carries its context everywhere.
+  convo.push({ role: "user", text: instruction }, { role: "agent", text: reply });
+  conversations.set(mandateId, convo.slice(-12));
+  void memory.rememberTurn(owner, { role: "user", text: instruction });
+  void memory.rememberTurn(owner, { role: "agent", text: reply });
+
   return {
-    mandateId, owner, reply, recalled: memory.length,
+    mandateId, owner, reply, recalled: longTerm.length + convo.length,
     understanding: plan.understanding, constraints: plan.constraints,
     steps: results.map((x) => x.summary), swapUrl: url,
   };
@@ -354,7 +377,7 @@ const server = createServer(async (req, res) => {
   const send = (code: number, body: unknown) => res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(body));
   try {
     if (req.method === "OPTIONS") return res.writeHead(204).end();
-    if (req.method === "GET" && req.url === "/health") return send(200, { ok: true, platform: platformAddr, claimed: agents.size, llm: hasLLMKey(), memory: hasMemory() });
+    if (req.method === "GET" && req.url === "/health") return send(200, { ok: true, platform: platformAddr, claimed: agents.size, llm: hasLLMKey(), memory: memory.enabled });
     if (req.method === "POST" && req.url === "/claim") {
       const { owner } = await json(req);
       if (!owner || !String(owner).startsWith("0x")) return send(400, { error: "connect a wallet first" });
@@ -382,7 +405,7 @@ server.listen(PORT, () => {
   console.log(`agent server on http://localhost:${PORT}`);
   console.log(`  platform: ${platformAddr}`);
   console.log(`  brain:    ${hasLLMKey() ? "Claude (" + (process.env.AVOW_LLM_MODEL ?? "claude-haiku-4-5") + ")" : "rule-based (set ANTHROPIC_API_KEY for Claude)"}`);
-  console.log(`  memory:   ${hasMemory() ? "MemWal (Walrus Memory) — the agent remembers across sessions" : "off (set MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID)"}`);
+  console.log(`  memory:   ${memory.enabled ? "MemWal on Walrus — the agent carries its memory across sessions" : "off (set MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID)"}`);
   console.log(`  POST /claim { owner }   ->  spins up a personal agent that grants the owner`);
   console.log(`  POST /agent { mandateId, instruction }  ->  plans, trades on DeepBook, proves it`);
 });

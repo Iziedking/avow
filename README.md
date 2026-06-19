@@ -20,12 +20,13 @@ And when one agent serves many people, each person sees only their own. Per-user
 enforced on chain, means your agent's reasoning for you is yours alone, not a promise, a key
 nobody else holds.
 
-That same sealed record is also the agent's **memory**. An Avow agent reads its own history back
-from Walrus before it acts, so it tracks state across sessions and builds over time: a trading
-agent remembers it opened a WAL position at 0.71, and when you later say "sell it for profit", it
-recalls that entry, checks the price, and only sells if it is genuinely up. Portable, verifiable,
-per-user memory on Walrus, the durable foundation autonomous agents need, with proof on top. The
-memory layer runs on **MemWal (Walrus Memory)** alongside our Seal-anchored evidence log.
+That same sealed record is also the agent's **memory**, and it ships in the SDK. One call,
+`createMemory()`, gives your agent `remember()` and `recall()` on Walrus: it reads its own history
+before it acts, tracks state across sessions, and builds over time. A trading agent remembers it
+opened a position at 0.71, and when you later say "sell it for profit", it recalls that entry,
+checks the price, and only sells if it is genuinely up. Log out, log back in, switch machines, the
+context comes with it, portable, verifiable, per-user memory on Walrus. Memory runs on **MemWal
+(Walrus Memory)**, proof runs on our Seal-anchored evidence log, and both come from `avow-sdk`.
 
 Built for Sui Overflow 2026, Walrus track.
 
@@ -295,6 +296,23 @@ const proof = await anchor({
   },
 });
 ```
+
+And memory, from the same SDK. `createMemory()` gives the agent a portable brain on Walrus, so it
+remembers what it did and recalls it on the next run, even after a restart or on another machine:
+
+```ts
+import { createMemory } from "avow-sdk";
+
+const memory = createMemory(); // reads MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID (memory.walrus.xyz)
+
+// After acting, remember it, scoped to the user, encrypted, on Walrus.
+await memory.remember(customerAddress, "Paid Stripe inv_42 for 1500 on 2026-06-19.");
+
+// Before acting next time, recall what is relevant; the agent builds over time.
+const context = await memory.recall(customerAddress, "what have I paid Stripe recently?");
+```
+
+Memory is a no-op when unconfigured, so the same code runs with or without a MemWal account.
 
 The [`examples/quickstart`](examples/quickstart) folder has a `create-mandate` script that
 mints the mandate and access for you, plus a runnable agent showing the call in context.

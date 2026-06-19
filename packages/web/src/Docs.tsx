@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
-type Section = "overview" | "sdk" | "cli";
+type Section = "overview" | "faq" | "sdk" | "cli";
 
 const SECTIONS: { id: Section; label: string }[] = [
   { id: "overview", label: "Overview" },
+  { id: "faq", label: "FAQ" },
   { id: "sdk", label: "SDK" },
   { id: "cli", label: "CLI" },
 ];
@@ -147,6 +148,9 @@ export function Docs({ open, onClose }: { open: boolean; onClose: () => void }) 
           <main className="doc-main" ref={mainRef}>
             <div id="doc-overview" className="doc-section">
               <Overview onJump={goTo} />
+            </div>
+            <div id="doc-faq" className="doc-section">
+              <Faq />
             </div>
             <div id="doc-sdk" className="doc-section">
               <Sdk />
@@ -341,6 +345,21 @@ authorized reader  ->  verify()
         readable JSON, and only through <code>verify()</code>. Everyone else sees noise.
       </p>
 
+      <h3>Memory the agent reads and builds on</h3>
+      <p>
+        The same record is also the agent's <strong>memory</strong>. Before it acts, an Avow agent
+        reads its own history back from Walrus, so it tracks state across sessions instead of
+        starting blank each time. A trading agent remembers it opened a position at one price, and
+        when you later say "sell it for profit", it recalls that entry, checks the market, and only
+        sells if it is genuinely up. Long-running, stateful behaviour from durable, portable data,
+        the foundation the Walrus track is about.
+      </p>
+      <p className="doc-muted">
+        Working memory runs on <strong>MemWal (Walrus Memory)</strong>, scoped per user; the proof
+        of each action runs on our Seal-anchored evidence log. MemWal for what the agent remembers,
+        Avow for proving what it did, both on Walrus, neither locked to this app.
+      </p>
+
       <div className="doc-jump">
         <button className="doc-pill" onClick={() => onJump("sdk")}>
           Integrate with the SDK →
@@ -348,6 +367,114 @@ authorized reader  ->  verify()
         <button className="doc-pill" onClick={() => onJump("cli")}>
           Use the command line →
         </button>
+      </div>
+    </article>
+  );
+}
+
+const FAQS: { q: string; a: ReactNode }[] = [
+  {
+    q: "What is Avow?",
+    a: (
+      <>
+        Avow is a verifiable trust and memory layer for AI agents. Build your agent with the Avow
+        SDK, and every action it takes, <em>and the reasoning behind it</em>, is sealed with Seal,
+        stored on Walrus, and anchored on Sui. Anyone you authorize can later replay exactly what
+        the agent did, why it did it, and confirm it stayed inside the rules you set. Proof, not
+        trust.
+      </>
+    ),
+  },
+  {
+    q: "What can Avow do?",
+    a: (
+      <>
+        It proves an agent's actions are correct and within your limits, an action that broke your
+        rules could never have been recorded in the first place. It stores every action and its full
+        reasoning durably on Walrus, encrypted per user with Seal. It gives the agent verifiable{" "}
+        <strong>memory</strong> it reads and builds on across sessions. And one shared agent can
+        serve many people, each decrypting only their own history, nobody else's.
+      </>
+    ),
+  },
+  {
+    q: "How do I use it?",
+    a: (
+      <>
+        Two calls. After your agent acts, call <code>anchor(action)</code>; to check a record, call{" "}
+        <code>verify(record)</code>. Set a <strong>mandate</strong> first, the rules (per-action and
+        daily caps, expiry, the agent's address), and the contract only records actions inside it.
+        Prefer no code? Use the CLI, or the live console: connect a wallet, claim a DeepBook agent,
+        fund it, and instruct it in plain English.
+      </>
+    ),
+  },
+  {
+    q: "How does it help shape my AI agent?",
+    a: (
+      <>
+        Once an agent is built with the Avow SDK, its correctness becomes <strong>provable</strong>.
+        Every action is stored and follows the agent everywhere, portable, not locked to one app or
+        model, and anyone you authorize can verify it independently. The agent also gains memory on
+        Walrus, so it remembers what it did and builds on it over time. Trust turns into proof, and
+        your agent gets a durable, portable spine it carries with it.
+      </>
+    ),
+  },
+  {
+    q: "Is my agent's data private?",
+    a: (
+      <>
+        Yes. Evidence is encrypted with Seal before it ever leaves the agent and stored as
+        ciphertext on Walrus, open a blob and you see random bytes. Only a reader the owner
+        authorized can decrypt it, enforced on chain by the Seal key servers. On a shared agent each
+        user's address is their key: they read their own records and physically cannot open anyone
+        else's.
+      </>
+    ),
+  },
+  {
+    q: "Does it work with any agent?",
+    a: (
+      <>
+        Any agent, any domain. A <strong>deterministic</strong> rule engine records its decision
+        path; an <strong>LLM</strong> agent records the model's chain of thought and the data it
+        acted on. The same <code>anchor()</code> and <code>verify()</code> either way. Finance,
+        productivity, gaming, if it acts, Avow can prove it.
+      </>
+    ),
+  },
+];
+
+function Faq() {
+  const [open, setOpen] = useState<Set<number>>(() => new Set([0]));
+  const toggle = (i: number) =>
+    setOpen((s) => {
+      const n = new Set(s);
+      if (n.has(i)) n.delete(i);
+      else n.add(i);
+      return n;
+    });
+  return (
+    <article className="doc-article">
+      <h2>FAQ</h2>
+      <div className="faq-list">
+        {FAQS.map((f, i) => {
+          const isOpen = open.has(i);
+          return (
+            <div key={i} className={`faq-item${isOpen ? " is-open" : ""}`}>
+              <button className="faq-q" onClick={() => toggle(i)} aria-expanded={isOpen}>
+                <span className="faq-q-text">{f.q}</span>
+                <span className="faq-plus" aria-hidden />
+              </button>
+              <div className="faq-a">
+                <div className="faq-a-inner">
+                  <p>{f.a}</p>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </article>
   );

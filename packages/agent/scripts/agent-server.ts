@@ -329,7 +329,7 @@ async function runInstruction(mandateId: string, instruction: string) {
   const reply = failures.length ? `${plan.reply} One thing: ${failures.join("; ")}.` : plan.reply;
 
   return {
-    mandateId, owner, reply,
+    mandateId, owner, reply, recalled: memory.length,
     understanding: plan.understanding, constraints: plan.constraints,
     steps: results.map((x) => x.summary), swapUrl: url,
   };

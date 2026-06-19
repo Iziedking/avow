@@ -13,13 +13,13 @@ const AGENT_API =
   (import.meta.env.VITE_AGENT_API as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:8787";
 const NEED_SUI = 1.5; // the user funds at least this much trading capital
 
-type LineKind = "cmd" | "sys" | "reply" | "outcome" | "proof" | "err";
+type LineKind = "cmd" | "sys" | "reply" | "memory" | "outcome" | "seal" | "proof" | "err";
 interface Line {
   kind: LineKind;
   text: string;
   href?: string; // when set, the line renders as a link (e.g. the on-chain proof)
 }
-const HZ: Record<LineKind, number> = { cmd: 600, sys: 520, reply: 720, outcome: 990, proof: 800, err: 300 };
+const HZ: Record<LineKind, number> = { cmd: 600, sys: 520, reply: 720, memory: 660, outcome: 990, seal: 740, proof: 800, err: 300 };
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 export function AgentConsole() {
@@ -68,7 +68,7 @@ export function AgentConsole() {
           setFunded(true);
           add("sys", `your agent is active — ${Number(sui).toFixed(2)} SUI ready. tell it what to do.`);
         } else {
-          add("sys", `your agent is active. fund it: send ~${NEED_SUI} SUI, then press "check".`);
+          add("sys", `your agent is active. fund it with some SUI, then press "check".`);
         }
       } catch {
         // backend offline; the user can still claim once it is running.
@@ -90,7 +90,7 @@ export function AgentConsole() {
       if (out.error) return add("err", out.error);
       setAgent({ address: out.agentAddress, mandate: out.mandateId });
       add("sys", `agent ready: ${out.agentAddress}`);
-      add("sys", `fund it: send ~${NEED_SUI} SUI to that address, then press "check".`);
+      add("sys", `fund it: send some SUI to that address, then press "check".`);
     } catch {
       add("err", `agent unreachable at ${AGENT_API}. start it: npx tsx packages/agent/scripts/agent-server.ts`);
     } finally {
@@ -107,7 +107,7 @@ export function AgentConsole() {
         setFunded(true);
         add("sys", `funded with ${Number(sui).toFixed(2)} SUI. tell the agent what to do.`);
       } else {
-        add("sys", `balance ${Number(sui).toFixed(2)} SUI. send a little more (>= ${NEED_SUI}).`);
+        add("sys", `balance ${Number(sui).toFixed(2)} SUI. send a little more, then check again.`);
       }
     } catch {
       add("err", "could not read the balance.");
@@ -126,9 +126,11 @@ export function AgentConsole() {
       const out = await api("/agent", { mandateId: agent.mandate, instruction: text });
       if (out.error) add("err", out.error);
       else {
+        if (out.recalled > 0) add("memory", `recalled ${out.recalled} from memory on Walrus`);
         if (out.reply) add("reply", out.reply); // the agent talking back
         const steps = (out.steps as string[] | undefined) ?? [];
         for (const s of steps) add("outcome", `✓ ${s}`);
+        if (steps.length) add("seal", "stored on Walrus · sealed with Seal");
         if (out.swapUrl) add("proof", "on-chain ↗ view on SuiScan", out.swapUrl);
         if (steps.length) add("sys", "verify the full reasoning on Avow ▾");
       }
@@ -174,6 +176,11 @@ export function AgentConsole() {
               <a key={i} className={`ac-line ac-${l.kind} ac-anchor`} href={l.href} target="_blank" rel="noreferrer">
                 {l.text}
               </a>
+            ) : l.kind === "memory" ? (
+              <div key={i} className="ac-memlane">
+                <span className="ml-track" aria-hidden />
+                <span className="ml-label">{l.text}</span>
+              </div>
             ) : (
               <div key={i} className={`ac-line ac-${l.kind}`}>
                 {l.text}

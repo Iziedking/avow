@@ -1091,6 +1091,12 @@ export function App() {
         chain, or the record does not verify.
       </p>
 
+      <a className="console-cta reveal" href="/?console">
+        <span className="cc-prompt">&gt;_</span>
+        <span className="cc-text">Testnet Console</span>
+        <span className="cc-sub">claim a live DeepBook agent ·  instruct it in plain English</span>
+      </a>
+
       <footer className="site-foot reveal">
         <div className="foot-main">
           <div className="foot-brand">

@@ -13,13 +13,13 @@ const AGENT_API =
   (import.meta.env.VITE_AGENT_API as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:8787";
 const NEED_SUI = 1.5; // the user funds at least this much trading capital
 
-type LineKind = "cmd" | "sys" | "outcome" | "proof" | "err";
+type LineKind = "cmd" | "sys" | "reply" | "outcome" | "proof" | "err";
 interface Line {
   kind: LineKind;
   text: string;
   href?: string; // when set, the line renders as a link (e.g. the on-chain proof)
 }
-const HZ: Record<LineKind, number> = { cmd: 600, sys: 520, outcome: 990, proof: 800, err: 300 };
+const HZ: Record<LineKind, number> = { cmd: 600, sys: 520, reply: 720, outcome: 990, proof: 800, err: 300 };
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
 
 export function AgentConsole() {
@@ -121,14 +121,16 @@ export function AgentConsole() {
     if (!text || busy || !agent) return;
     setBusy(true);
     add("cmd", `${short(account!.address)}@avow:~$ ${text}`);
-    add("sys", "agent reading the market and reasoning…");
+    add("sys", "agent recalling its memory and reading the market…");
     try {
       const out = await api("/agent", { mandateId: agent.mandate, instruction: text });
-      if (out.error) add("err", `the agent stopped: ${out.error}`);
+      if (out.error) add("err", out.error);
       else {
-        for (const s of (out.steps as string[] | undefined) ?? ["done"]) add("outcome", `✓ ${s}`);
+        if (out.reply) add("reply", out.reply); // the agent talking back
+        const steps = (out.steps as string[] | undefined) ?? [];
+        for (const s of steps) add("outcome", `✓ ${s}`);
         if (out.swapUrl) add("proof", "on-chain ↗ view on SuiScan", out.swapUrl);
-        add("sys", "done. verify the full reasoning on Avow ▾");
+        if (steps.length) add("sys", "verify the full reasoning on Avow ▾");
       }
     } catch {
       add("err", "agent unreachable. is the backend running?");

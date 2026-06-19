@@ -18,6 +18,7 @@ import {
 } from "avow-sdk";
 import { makePlan, hasLLMKey, type Plan, type PlanStep, type Token } from "./brain";
 import { marketSnapshot, swap, placeLimit, deposit, withdraw, cancelAll, createManager, execWithRetry, POOL_PAIRS, COIN_TYPE } from "./deepbook";
+import { recall, remember, hasMemory } from "./memory";
 
 // Load .env ourselves (tsx does not), so ANTHROPIC_API_KEY and friends are picked up.
 function loadDotenv() {
@@ -162,6 +163,7 @@ function fallbackPlan(instruction: string, _state: unknown): Plan {
   const from = (m && SYMBOL[m[2]]) || "SUI";
   const to = (m && SYMBOL[m[3]]) || "DBUSDC";
   return {
+    reply: `On it, swapping ${amount} ${from} into ${to}.`,
     understanding: `Swap ${amount} ${from} into ${to}.`,
     constraints: { summary: `exactly ${amount} ${from}, no more`, maxSpend: amount, spendToken: from },
     steps: [{ action: "swap", fromToken: from, toToken: to, amount, why: `the instruction asked to swap ${amount} ${from} to ${to}` }],
@@ -173,6 +175,7 @@ function fallbackPlan(instruction: string, _state: unknown): Plan {
       ],
       outcome: `Swapped ${amount} ${from} into ${to} on DeepBook.`,
     },
+    remember: `Swapped ${amount} ${from} into ${to}.`,
   };
 }
 
@@ -264,8 +267,10 @@ async function runInstruction(mandateId: string, instruction: string) {
   const addr = kp.getPublicKey().toSuiAddress();
   if ((await agentSuiBalance(addr)) < 1) throw new Error("fund the agent first: it needs at least ~1 SUI to trade");
 
-  // Read the live market, then turn the instruction into a plan + reasoning.
-  const state = await marketSnapshot(addr);
+  // Read the live market AND recall what the agent has done for this user, then plan over both.
+  const snap = await marketSnapshot(addr);
+  const memory = await recall(owner, instruction);
+  const state = { ...snap, memory };
   const plan = hasLLMKey() ? await makePlan(instruction, state) : fallbackPlan(instruction, state);
 
   // Rebuild the model's reasoning as an Avow trace.
@@ -278,35 +283,56 @@ async function runInstruction(mandateId: string, instruction: string) {
     else r.think(s.title, d);
   }
 
-  // Execute the steps, enforcing the rule taken from the prompt.
+  // Execute the steps, enforcing the rule taken from the prompt. A step that can't run (too small,
+  // untradeable, limit used up) becomes a plain-language note, not a crash.
   const results: StepResult[] = [];
+  const failures: string[] = [];
   let spent = 0;
   for (const step of plan.steps ?? []) {
-    const out = await executeStep(entry, addr, step, plan.constraints, spent);
-    if (out) {
-      results.push(out);
-      spent += out.spent;
+    try {
+      const out = await executeStep(entry, addr, step, plan.constraints, spent);
+      if (out) {
+        results.push(out);
+        spent += out.spent;
+      }
+    } catch (e) {
+      failures.push((e as Error).message);
     }
   }
-  if (!results.length) throw new Error("the agent decided not to act: " + (plan.reasoning?.outcome || plan.understanding));
-
-  const outcome = plan.reasoning?.outcome || results.map((x) => x.summary).join("; ");
+  // Anchor a proof when the agent acted, or when it deliberately held (a decision worth proving).
+  // A purely conversational turn ("I can't trade that") just talks back, no record.
+  const held = !results.length && (plan.steps ?? []).some((s) => s.action === "hold");
+  const outcome = plan.reasoning?.outcome || results.map((x) => x.summary).join("; ") || plan.reply;
   const reasoning = r.build(outcome);
-
   const primary = results[0];
-  await anchor({
-    suiClient: sui, sealClient: seal, walrusClient: walrus, signer: kp, mandateId, accessId,
-    bundle: {
-      version: EVIDENCE_VERSION, mandateId, agent: addr, user: addr, reasoning,
-      actionType: primary.actionType, target: primary.target, amount: primary.amount,
-      rationale: plan.constraints?.summary || outcome,
-      observed: { understanding: plan.understanding, constraints: plan.constraints, market: state, steps: results.map((x) => x.summary) },
-      txDigests: results.map((x) => x.digest).filter(Boolean), timestampMs: Date.now(),
-    },
-  });
+  let url = "";
 
-  const url = primary.digest ? `https://suiscan.xyz/${NETWORK}/tx/${primary.digest}` : "";
-  return { mandateId, owner, reasoning, understanding: plan.understanding, constraints: plan.constraints, steps: results.map((x) => x.summary), swapUrl: url };
+  if (results.length || held) {
+    await anchor({
+      suiClient: sui, sealClient: seal, walrusClient: walrus, signer: kp, mandateId, accessId,
+      bundle: {
+        version: EVIDENCE_VERSION, mandateId, agent: addr, user: addr, reasoning,
+        actionType: primary?.actionType ?? "hold", target: primary?.target ?? "deepbook", amount: primary?.amount ?? "0",
+        rationale: plan.constraints?.summary || outcome,
+        observed: { understanding: plan.understanding, constraints: plan.constraints, memory, steps: results.map((x) => x.summary) },
+        txDigests: results.map((x) => x.digest).filter(Boolean), timestampMs: Date.now(),
+      },
+    });
+    url = primary?.digest ? `https://suiscan.xyz/${NETWORK}/tx/${primary.digest}` : "";
+  }
+
+  // Remember what just happened, so the next instruction can build on it (sell what we bought, etc).
+  const note = plan.remember || (results.length ? results.map((x) => x.summary).join("; ") : "");
+  if (note) await remember(owner, note);
+
+  // Talk back: the agent's own words, plus an honest note about anything that couldn't run.
+  const reply = failures.length ? `${plan.reply} One thing: ${failures.join("; ")}.` : plan.reply;
+
+  return {
+    mandateId, owner, reply,
+    understanding: plan.understanding, constraints: plan.constraints,
+    steps: results.map((x) => x.summary), swapUrl: url,
+  };
 }
 
 function readBody(req: IncomingMessage): Promise<string> {
@@ -328,7 +354,7 @@ const server = createServer(async (req, res) => {
   const send = (code: number, body: unknown) => res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(body));
   try {
     if (req.method === "OPTIONS") return res.writeHead(204).end();
-    if (req.method === "GET" && req.url === "/health") return send(200, { ok: true, platform: platformAddr, claimed: agents.size, llm: hasLLMKey() });
+    if (req.method === "GET" && req.url === "/health") return send(200, { ok: true, platform: platformAddr, claimed: agents.size, llm: hasLLMKey(), memory: hasMemory() });
     if (req.method === "POST" && req.url === "/claim") {
       const { owner } = await json(req);
       if (!owner || !String(owner).startsWith("0x")) return send(400, { error: "connect a wallet first" });
@@ -356,6 +382,7 @@ server.listen(PORT, () => {
   console.log(`agent server on http://localhost:${PORT}`);
   console.log(`  platform: ${platformAddr}`);
   console.log(`  brain:    ${hasLLMKey() ? "Claude (" + (process.env.AVOW_LLM_MODEL ?? "claude-haiku-4-5") + ")" : "rule-based (set ANTHROPIC_API_KEY for Claude)"}`);
+  console.log(`  memory:   ${hasMemory() ? "MemWal (Walrus Memory) — the agent remembers across sessions" : "off (set MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID)"}`);
   console.log(`  POST /claim { owner }   ->  spins up a personal agent that grants the owner`);
   console.log(`  POST /agent { mandateId, instruction }  ->  plans, trades on DeepBook, proves it`);
 });

@@ -20,6 +20,13 @@ And when one agent serves many people, each person sees only their own. Per-user
 enforced on chain, means your agent's reasoning for you is yours alone, not a promise, a key
 nobody else holds.
 
+That same sealed record is also the agent's **memory**. An Avow agent reads its own history back
+from Walrus before it acts, so it tracks state across sessions and builds over time: a trading
+agent remembers it opened a WAL position at 0.71, and when you later say "sell it for profit", it
+recalls that entry, checks the price, and only sells if it is genuinely up. Portable, verifiable,
+per-user memory on Walrus, the durable foundation autonomous agents need, with proof on top. The
+memory layer runs on **MemWal (Walrus Memory)** alongside our Seal-anchored evidence log.
+
 Built for Sui Overflow 2026, Walrus track.
 
 ## The problem
@@ -183,11 +190,13 @@ record for anyone to verify.
 
 ### The live DeepBook trading agent, end to end
 
-The headline demo needs no developer setup: a real person claims an agent, funds it, and trades
-from plain English, then verifies the reasoning themselves. Start the agent backend alongside
-the dashboard:
+The headline demo needs no developer setup: a real person claims an agent, funds it, and instructs
+it in plain English, then verifies the reasoning themselves. The agent's brain is Claude (any LLM
+plugs in, and a deterministic parser is the fallback): it reads the instruction, takes the rules
+from your words, and trades on DeepBook for real. Start the agent backend alongside the dashboard:
 
 ```bash
+# optional: add ANTHROPIC_API_KEY=sk-ant-... to .env to use Claude (else a rule-based parser)
 npx tsx packages/agent/scripts/agent-server.ts   # the agent backend, signs trades autonomously
 npm -w @avow/web run dev                          # the dashboard and the console
 ```
@@ -196,10 +205,13 @@ Open `/?console`, connect a wallet, and:
 
 1. **Claim** a personal DeepBook agent: a fresh wallet that signs its own trades with no popups.
    Because it is built with the Avow SDK, at claim time it grants your wallet read access.
-2. **Fund** it with a little SUI, its trading capital. The platform covers the tiny DEEP and WAL
-   it needs for fees and storage.
-3. **Instruct** it in plain English, for example `swap 1 SUI to stablecoin`. It reads the
-   DeepBook market, checks the mandate, trades for real, and seals its full reasoning.
+2. **Fund** it with a little SUI, its trading capital. The platform seeds the tiny DEEP and WAL it
+   needs for fees and storage, so trading never waits on a thin pool.
+3. **Instruct** it in plain English. The rule comes from your words, not a hardcoded cap:
+   `swap 1 SUI to USDC` does exactly 1 SUI, `buy SUI but don't spend above 5 USDC` is enforced and
+   recorded in the proof. The agent reads the live market, plans with Claude, and acts: market
+   swaps across SUI / USDC / DEEP / USDT / BTC (auto-routing, bridging through USDC when needed),
+   resting limit orders, or moving funds in and out of its vault, then seals the full reasoning.
 4. **Verify** on the Avow home with the same wallet. Your records decrypt for you alone; a
    different wallet is refused by the Seal key servers.
 
@@ -208,11 +220,13 @@ lives on the Avow home, sealed to your wallet. This is Avow for someone with no 
 knowledge: the wallet is the only identity, and the proof is one click away. The claimed agent
 is remembered per wallet, so the next time you connect it greets you with "your agent is active".
 
-The backend needs a little WAL for storage. Top it up with the helper, which swaps on the Walrus
-exchange (pass `sui` to swap the other way) and never prints your key:
+The platform keeps small SUI, WAL, and DEEP reserves to fund agents. Top up WAL with the helper,
+which swaps on the Walrus exchange (pass `sui` to swap the other way) and never prints your key;
+recover DEEP from spent agents with `sweep-deep`:
 
 ```bash
 npx tsx packages/agent/scripts/get-wal.ts 2      # 2 SUI -> ~2 WAL
+npx tsx packages/agent/scripts/sweep-deep.ts     # pull leftover DEEP back to the platform
 ```
 
 ## Roles: owner, agent, auditor

@@ -33,6 +33,7 @@ export interface ReasoningStep {
 }
 
 export interface Plan {
+  reply: string; // one or two friendly sentences spoken to the user (the agent talking back)
   understanding: string; // what the user wants, in plain words
   constraints: {
     summary: string; // the rule taken from the instruction
@@ -41,6 +42,7 @@ export interface Plan {
   };
   steps: PlanStep[];
   reasoning: { goal: string; steps: ReasoningStep[]; outcome: string };
+  remember?: string | null; // a fact worth saving to memory (e.g. "opened a WAL position at 0.71")
 }
 
 // Market + wallet context handed to the model so it reasons over real numbers.
@@ -48,13 +50,16 @@ export interface MarketState {
   balances: Record<string, number>; // token -> human amount the agent holds
   prices: Record<string, number>; // poolKey -> mid price (quote per base)
   pools: string[]; // tradeable pools
+  memory: string[]; // what the agent remembers doing for this user (Walrus via MemWal)
 }
 
 const PLAN_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["understanding", "constraints", "steps", "reasoning"],
+  required: ["reply", "understanding", "constraints", "steps", "reasoning"],
   properties: {
+    reply: { type: "string", description: "One or two friendly sentences spoken to the user. Explain what you are doing and why, reference what you remember when relevant, and if you cannot act, say why and suggest an alternative or ask a question. Never a dead end." },
+    remember: { type: "string", description: "A short fact worth saving to memory for next time, e.g. 'Opened a 0.3 WAL position at 0.71 SUI.' Omit if nothing is worth remembering." },
     understanding: { type: "string", description: "What the user wants, in plain words." },
     constraints: {
       type: "object",
@@ -129,6 +134,19 @@ Rules:
   observe (what you read), think (what you weighed), tool (a quote or check), decide (the action).
 - Keep every "why" and reasoning line to one plain sentence. No jargon a non-developer can't read.
 
+You have MEMORY of what you did before for this user (listed below). Use it to build over time:
+- For "sell for profit", "take profit", or "close my position", recall what you bought and at what
+  price, compare to the current price, and only sell if it is genuinely up; if it is not yet in
+  profit, do not sell, explain that in the reply, and hold.
+- When you open a position, set "remember" to a short note (token, amount, price) so you can act on
+  it later. When you close one, remember that too.
+- Reference what you remember in your reasoning and your reply ("you're holding 0.3 WAL from 0.71").
+
+Always set "reply": talk to the user like a person. Say what you are doing and why, mention the
+remembered position when relevant, and if you cannot do something (an untradeable token, a limit
+already used up, nothing in profit yet), say so plainly and suggest an alternative or ask a
+question. Never leave them with a dead end.
+
 Call submit_plan exactly once with your plan.`;
 
 function buildUserMessage(instruction: string, state: MarketState): string {
@@ -138,6 +156,7 @@ function buildUserMessage(instruction: string, state: MarketState): string {
   const px = Object.entries(state.prices)
     .map(([p, v]) => `${p} mid ${v}`)
     .join(", ");
+  const mem = state.memory.length ? state.memory.map((m) => `- ${m}`).join("\n") : "(nothing yet)";
   return [
     `Instruction: "${instruction}"`,
     ``,
@@ -145,7 +164,11 @@ function buildUserMessage(instruction: string, state: MarketState): string {
     `DeepBook prices: ${px || "(none read)"}`,
     `Tradeable pools: ${state.pools.join(", ")}`,
     ``,
-    `Produce the plan. Honor the instruction exactly and stay within any limit it states.`,
+    `What you remember doing for this user:`,
+    mem,
+    ``,
+    `Produce the plan. Honor the instruction exactly, stay within any limit it states, and use your`,
+    `memory: for "sell for profit" recall what you bought and only sell if it is actually up.`,
   ].join("\n");
 }
 

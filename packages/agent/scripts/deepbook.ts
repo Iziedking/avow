@@ -31,16 +31,19 @@ export const SCALAR: Record<Token, number> = {
   DBTC: 1e8,
 };
 
-// pool -> [base, quote]. The agent trades the pairs the platform can fund.
+// pool -> [base, quote]. The agent trades the pairs the platform can fund. WAL here is DeepBook's
+// tradeable WAL (0x9ef7...), distinct from the storage WAL the platform uses for Walrus.
 export const POOL_PAIRS: Record<string, [Token, Token]> = {
   SUI_DBUSDC: ["SUI", "DBUSDC"],
   DEEP_DBUSDC: ["DEEP", "DBUSDC"],
   DBUSDT_DBUSDC: ["DBUSDT", "DBUSDC"],
   DBTC_DBUSDC: ["DBTC", "DBUSDC"],
+  WAL_DBUSDC: ["WAL", "DBUSDC"],
+  WAL_SUI: ["WAL", "SUI"],
   DEEP_SUI: ["DEEP", "SUI"],
 };
 export const POOLS = Object.keys(POOL_PAIRS);
-export const TRADEABLE: Token[] = ["SUI", "DBUSDC", "DEEP", "DBUSDT", "DBTC"];
+export const TRADEABLE: Token[] = ["SUI", "DBUSDC", "DEEP", "DBUSDT", "DBTC", "WAL"];
 
 const MANAGER_KEY = "AGENT";
 
@@ -131,6 +134,14 @@ async function swapHop(kp: Ed25519Keypair, addr: string, from: Token, to: Token,
   const route = directRoute(from, to);
   if (!route) throw new Error(`no direct pool for ${from}->${to}`);
   const db = makeDB(addr);
+  // Quote first: if it would fill ~nothing, the amount is below the pool's minimum size. Stop here
+  // rather than burn a transaction and report a phantom swap.
+  const expectedOut = route.baseForQuote
+    ? (await db.getQuoteQuantityOut(route.poolKey, amount)).quoteOut
+    : (await db.getBaseQuantityOut(route.poolKey, amount)).baseOut;
+  if (!expectedOut || expectedOut <= 0) {
+    throw new Error(`${amount} ${from} is below DeepBook's minimum trade size for ${from}/${to}; try a larger amount`);
+  }
   const before = await balance(addr, to);
   const res = await execWithRetry(async () => {
     const tx = new Transaction();

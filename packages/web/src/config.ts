@@ -4,7 +4,7 @@
 export const NETWORK = "testnet" as const;
 
 export const PACKAGE_ID =
-  "0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e";
+  "0xace239ce0defd77ce0c4e570233b37a86ac53377a38ae59749feda3ec9715667";
 
 // After a package upgrade, struct and event TYPES stay anchored to the package id that first
 // defined them. So type/event QUERIES (owned-object StructType filters, MoveEventType queries)
@@ -27,14 +27,8 @@ export const DEMO_AGENTS: DemoAgent[] = [
   {
     name: "Bill payer",
     blurb:
-      "Pays your bills automatically, and provably refuses overcharges, unknown billers, and anything over your limit.",
-    mandateId: "0x745492d3c02d9095a81744a30024b72a27c5566229fa5db2fef672352012480f",
-  },
-  {
-    name: "Yield router",
-    blurb:
-      "Routes funds to the best risk-adjusted yield, and provably ignores pools that are too risky.",
-    mandateId: "0x1d6d7892132773b525278fd714b2acbfa96fff762ae0a0c3b97bd094b89568db",
+      "One shared agent paying the bills of two consumers. Watch its full reasoning for each decision, and how it seals each consumer's records so they only ever see their own.",
+    mandateId: "0x80d5da99a1d51ed92fbc9cee907ce9b7c7c666b54751ec527108481984a7f32c",
   },
 ];
 
@@ -42,10 +36,33 @@ export const DEMO_AGENTS: DemoAgent[] = [
 export const DEMO_MANDATE_ID = DEMO_AGENTS[0].mandateId;
 
 // A read-only key, pre-granted as an auditor on the demo agents above, so anyone can verify them
-// on the dashboard without owning them or connecting a wallet. It can ONLY decrypt the demo
-// agents' sealed evidence, it holds no funds and cannot anchor, grant, or sign anything else.
+// on the dashboard without owning them or connecting a wallet. As a global reader it can decrypt
+// every user's evidence on the demo agent, the "owner" view. It holds no funds and cannot
+// anchor, grant, or sign anything else.
 export const DEMO_READER_KEY =
-  "suiprivkey1qqfmvq2cdp242jnrvqr0hutlzkr5lrhvxlny3g7vxmt9wuw4lcjqs7m46s3";
+  "suiprivkey1qqant7wdkk409ygmzhu7uw77pyact9npp76ql0ee5tlcrk9rkr62y3rwwvw";
+
+// The demo consumers of the shared bill payer. Each key decrypts ONLY that user's own records
+// (Seal's account-based policy), so the dashboard can let you "view as" each one and see that
+// the per-user isolation is real, not cosmetic. These are throwaway demo keys.
+export interface DemoUser {
+  name: string;
+  address: string;
+  key: string;
+}
+
+export const DEMO_USERS: DemoUser[] = [
+  {
+    name: "Alice",
+    address: "0xc5ae450191e8e59ce6afb2b7fbb7a90b9cb730068ed9520383b58b92139710fa",
+    key: "suiprivkey1qqzkftwu65htj4wdhse6l3ej6vm6lmd5awvhchg88q56pnxxxghh5aqeac2",
+  },
+  {
+    name: "Bob",
+    address: "0x2b53a1f870e777faa1df9a998cf006a7c09c599499bc8899630f3375c08611cd",
+    key: "suiprivkey1qray77c6fu2z3n73uxugm9kgtu89yjk6y0g4ye60dstpzwjznccdqslgsmf",
+  },
+];
 
 export const SUISCAN = `https://suiscan.xyz/${NETWORK}`;
 export const WALRUS_AGGREGATOR = "https://aggregator.walrus-testnet.walrus.space";

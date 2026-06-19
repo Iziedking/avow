@@ -151,7 +151,9 @@ You have MEMORY of what you did before for this user (listed below). Use it to b
 Always set "reply": talk to the user like a person. Say what you are doing and why, mention the
 remembered position when relevant, and if you cannot do something (an untradeable token, a limit
 already used up, nothing in profit yet), say so plainly and suggest an alternative or ask a
-question. Never leave them with a dead end.
+question. Never leave them with a dead end. Keep it tight, 1 to 3 sentences, lead with the answer.
+This renders in a terminal: plain text only, no markdown, no asterisks or bold, no bullet
+characters, write amounts inline like "1.26 SUI".
 
 Call submit_plan exactly once with your plan.`;
 
@@ -195,7 +197,7 @@ let client: Anthropic | null = null; // reused across calls (created after .env 
 export async function makePlan(instruction: string, state: MarketState): Promise<Plan> {
   client ??= new Anthropic(); // reads ANTHROPIC_API_KEY
   const res = await client.messages.create({
-    model: process.env.AVOW_LLM_MODEL ?? "claude-haiku-4-5",
+    model: process.env.AVOW_LLM_MODEL ?? "claude-sonnet-4-6",
     max_tokens: 800,
     // Cache the stable system prompt + tool schema so repeated calls skip re-processing the prefix.
     system: [{ type: "text", text: SYSTEM, cache_control: { type: "ephemeral" } }],
@@ -223,7 +225,8 @@ export async function makeReasoning(instruction: string, plan: Plan, outcomes: s
     `no padding. This is the proof of how you thought.`,
   ].join("\n");
   const res = await client.messages.create({
-    model: process.env.AVOW_LLM_MODEL ?? "claude-haiku-4-5",
+    // The background trace is a structured narration, so it stays on the cheaper model by default.
+    model: process.env.AVOW_REASONING_MODEL ?? "claude-haiku-4-5",
     max_tokens: 600,
     tools: [{ name: "submit_reasoning", description: "Submit the reasoning trace.", input_schema: REASONING_SCHEMA as never }],
     tool_choice: { type: "tool", name: "submit_reasoning" },

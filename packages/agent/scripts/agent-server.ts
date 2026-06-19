@@ -277,24 +277,26 @@ async function runInstruction(mandateId: string, instruction: string) {
   // Read the market, recall long-term memory, and recover this session's conversation, all at once
   // (this parallelism is the biggest latency win). On a fresh start (new login, server restart) the
   // conversation comes back from Walrus, so the agent picks the thread back up.
-  // The long-term memory lookup is the slowest read, so only do it when the instruction actually
-  // reaches back ("sell my position", "profit", "again"). A plain "swap 1 SUI to USDC" skips it;
-  // the cached conversation still gives the agent recent context for follow-ups either way.
-  const needsMemory = /\b(profit|position|again|more|earlier|before|sell|hold|already|remember|continue|last|previous|what have|what did|my (wal|sui|usdc|deep|usdt|btc|dbusdc|dbtc))\b/i.test(instruction);
+  //
+  // Fast path: an explicit, self-contained swap ("swap 1 SUI to USDC") needs no judgement and no
+  // memory, so it skips both the LLM and the slow Walrus recall. Everything else is conversational
+  // and gets the agent's full context, its long-term memory plus this session's conversation, so a
+  // question like "which of my holdings is up?" actually reaches back to what it bought.
+  const explicitSwap = /^\s*(swap|convert)\s+[\d.]+\s+[a-z]+\s+(to|for|into)\s+[a-z]+\s*\.?\s*$/i.test(instruction);
   const cached = conversations.get(mandateId);
-  const [snap, longTerm, convo] = await Promise.all([
+  const [snap, tradeFacts, instrFacts, convo] = await Promise.all([
     marketSnapshot(addr),
-    needsMemory ? memory.recall(owner, instruction, 4) : Promise.resolve([] as string[]),
+    // Always pull the trade history with a phrasing the recall reliably matches, so the agent knows
+    // its positions however the user asks ("which holding is up?", "should I sell?").
+    explicitSwap ? Promise.resolve([] as string[]) : memory.recall(owner, "what did I buy or sell and at what price", 6),
+    // Plus anything else this specific instruction reaches for.
+    explicitSwap ? Promise.resolve([] as string[]) : memory.recall(owner, instruction, 4),
     cached ? Promise.resolve(cached) : memory.recallConversation(owner, 5),
   ]);
   if (!cached) conversations.set(mandateId, convo);
+  const longTerm = Array.from(new Set([...tradeFacts, ...instrFacts]));
 
   const state = { ...snap, memory: longTerm, conversation: convo.slice(-8) };
-
-  // Fast path: an explicit, self-contained swap ("swap 1 SUI to USDC") is handled by the parser
-  // instantly, no LLM round-trip and no quality lost on a trade that needs no judgement. Anything
-  // conversational, conditional, or memory-bound ("sell my WAL for profit", "use 0.5") goes to Claude.
-  const explicitSwap = /^\s*(swap|convert)\s+[\d.]+\s+[a-z]+\s+(to|for|into)\s+[a-z]+\s*\.?\s*$/i.test(instruction) && !needsMemory;
   const plan = !hasLLMKey() || explicitSwap ? fallbackPlan(instruction, state) : await makePlan(instruction, state);
 
   // Execute the steps, enforcing the rule taken from the prompt. A step that can't run (too small,

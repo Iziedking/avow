@@ -50,9 +50,31 @@ export class AvowMemory {
     return this.client !== null;
   }
 
-  // One memory space per user, so each wallet recalls only its own history.
+  // One memory space per user, so each wallet recalls only its own history. Facts (trades,
+  // decisions) and conversation turns live in separate spaces, so recalling "what did I buy" never
+  // dredges up the chatter, and the agent never reinforces its own earlier replies.
   private ns(user: string): string {
     return `avow-${user.toLowerCase().replace(/^0x/, "").slice(0, 12)}`;
+  }
+  private chatNs(user: string): string {
+    return `${this.ns(user)}-chat`;
+  }
+
+  // Recall with a couple of retries: the relayer occasionally drops a request ("fetch failed"), and
+  // a stalled lookup must never sink a live answer.
+  private async tryRecall(query: string, limit: number, namespace: string): Promise<string[]> {
+    if (!this.client) return [];
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await this.client.recall({ query, limit, namespace });
+        return (r.results ?? []).map((x: { text: string }) => x.text).filter(Boolean);
+      } catch (e) {
+        lastErr = e;
+      }
+    }
+    console.error("avow memory: recall failed:", (lastErr as Error)?.message);
+    return [];
   }
 
   /** Remember a durable fact for this user (a trade, a decision, a preference). Stored on Walrus,
@@ -66,34 +88,32 @@ export class AvowMemory {
     }
   }
 
-  /** Recall what is relevant to a query, by meaning, from this user's memory on Walrus. */
+  /** Recall what is relevant to a query, by meaning, from this user's facts on Walrus. Conversation
+   *  turns are excluded (they live in their own space; legacy ones are filtered by prefix). */
   async recall(user: string, query: string, limit = 6): Promise<string[]> {
-    if (!this.client) return [];
-    try {
-      const r = await this.client.recall({ query, limit, namespace: this.ns(user) });
-      return (r.results ?? []).map((x: { text: string }) => x.text).filter(Boolean);
-    } catch (e) {
-      console.error("avow memory: recall failed:", (e as Error).message);
-      return [];
-    }
+    const out = await this.tryRecall(query, limit, this.ns(user));
+    return out.filter((t) => !t.startsWith(CHAT_PREFIX));
   }
 
-  /** Remember one conversation turn, so the agent can pick the thread back up after logout/login. */
+  /** Remember one conversation turn (in the chat space), so the agent picks the thread back up
+   *  after logout/login without polluting its fact recall. */
   async rememberTurn(user: string, turn: ConversationTurn): Promise<void> {
-    await this.remember(user, `${CHAT_PREFIX} ${turn.role}: ${turn.text}`);
+    if (!this.client) return;
+    try {
+      await this.client.rememberAndWait(`${turn.role}: ${turn.text}`, this.chatNs(user), { timeoutMs: 30_000 });
+    } catch (e) {
+      console.error("avow memory: rememberTurn failed:", (e as Error).message);
+    }
   }
 
   /** Recover the recent conversation with this user from Walrus, so logging back in carries
    *  context, the agent remembers what you were doing together. */
   async recallConversation(user: string, limit = 8): Promise<ConversationTurn[]> {
-    const lines = await this.recall(user, "our recent conversation, what we discussed and decided", limit);
-    return lines
-      .filter((l) => l.startsWith(CHAT_PREFIX))
-      .map((l) => {
-        const body = l.slice(CHAT_PREFIX.length).trim();
-        const role: ConversationTurn["role"] = body.startsWith("agent:") ? "agent" : "user";
-        return { role, text: body.replace(/^(user|agent):\s*/, "") };
-      });
+    const out = await this.tryRecall("our recent conversation, what we discussed and decided", limit, this.chatNs(user));
+    return out.map((t): ConversationTurn => {
+      const role: ConversationTurn["role"] = t.startsWith("agent:") ? "agent" : "user";
+      return { role, text: t.replace(/^(user|agent):\s*/, "") };
+    });
   }
 }
 

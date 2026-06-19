@@ -21,6 +21,13 @@ interface Line {
 }
 const HZ: Record<LineKind, number> = { cmd: 600, sys: 520, reply: 720, memory: 660, outcome: 990, seal: 740, proof: 800, err: 300 };
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+// This is a plain terminal: strip any stray markdown the model emits (bold, code ticks, bullets).
+const plain = (s: string) =>
+  s
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^\s*[-*]\s+/gm, "");
 
 export function AgentConsole() {
   const account = useCurrentAccount();
@@ -28,9 +35,11 @@ export function AgentConsole() {
   const [funded, setFunded] = useState(false);
   const [lines, setLines] = useState<Line[]>([]);
   const [busy, setBusy] = useState(false);
+  const [queue, setQueue] = useState<string[]>([]); // messages waiting their turn, like a chat
   const [instruction, setInstruction] = useState("");
   const [copied, setCopied] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
+  const processingRef = useRef(false); // guards the queue so only one instruction runs at a time
 
   const add = (kind: LineKind, text: string, href?: string) => {
     setLines((ls) => [...ls, { kind, text, href }]);
@@ -45,8 +54,8 @@ export function AgentConsole() {
     return res.json();
   };
   useEffect(() => {
-    screenRef.current?.scrollTo({ top: screenRef.current.scrollHeight });
-  }, [lines]);
+    screenRef.current?.scrollTo({ top: screenRef.current.scrollHeight, behavior: "smooth" });
+  }, [lines, queue, busy]);
 
   // When a wallet connects, restore the agent it already claimed (persisted server-side) so the
   // user picks up where they left off. The agent is tied to your identity, so disconnect clears it.
@@ -116,37 +125,53 @@ export function AgentConsole() {
     }
   }
 
-  async function run() {
+  // Submit never blocks. Your message joins the queue and the input clears at once, so you can type
+  // the next one immediately, just like a chat. The queue drains one at a time below.
+  function run() {
     const text = instruction.trim();
-    if (!text || busy || !agent) return;
-    setInstruction(""); // clear the input the moment you send, the message moves into the log
-    setBusy(true);
-    add("cmd", text); // your message (the prompt prefix is drawn in the render)
-    add("sys", "agent recalling its memory and reading the market…");
-    try {
-      const out = await api("/agent", { mandateId: agent.mandate, instruction: text });
-      if (out.error) add("err", out.error);
-      else {
-        if (out.recalled > 0) add("memory", `recalled ${out.recalled} from memory on Walrus`);
-        if (out.reply) add("reply", out.reply); // the agent talking back
-        const steps = (out.steps as string[] | undefined) ?? [];
-        for (const s of steps) add("outcome", `✓ ${s}`);
-        if (steps.length) add("seal", "stored on Walrus · sealed with Seal");
-        if (out.swapUrl) add("proof", "on-chain ↗ view on SuiScan", out.swapUrl);
-        if (steps.length) add("sys", "verify the full reasoning on Avow ▾");
-      }
-    } catch {
-      add("err", "agent unreachable. is the backend running?");
-    } finally {
-      setBusy(false);
-    }
+    if (!text || !agent) return;
+    setInstruction("");
+    setQueue((q) => [...q, text]);
   }
+
+  // Drain the queue one instruction at a time. Re-runs whenever the queue changes; the ref guard
+  // keeps exactly one in flight (so the agent never races its own gas) while the input stays live.
+  useEffect(() => {
+    if (processingRef.current || !agent || queue.length === 0) return;
+    processingRef.current = true;
+    setBusy(true);
+    const text = queue[0];
+    (async () => {
+      add("cmd", text); // your message (the prompt prefix is drawn in the render)
+      add("sys", "agent recalling its memory and reading the market…");
+      try {
+        const out = await api("/agent", { mandateId: agent.mandate, instruction: text });
+        if (out.error) add("err", out.error);
+        else {
+          if (out.recalled > 0) add("memory", `recalled ${out.recalled} from memory on Walrus`);
+          if (out.reply) add("reply", plain(out.reply)); // the agent talking back
+          const steps = (out.steps as string[] | undefined) ?? [];
+          for (const s of steps) add("outcome", `✓ ${s}`);
+          if (steps.length) add("seal", "stored on Walrus · sealed with Seal");
+          if (out.swapUrl) add("proof", "on-chain ↗ view on SuiScan", out.swapUrl);
+          if (steps.length) add("sys", "verify the full reasoning on Avow ▾");
+        }
+      } catch {
+        add("err", "agent unreachable. is the backend running?");
+      } finally {
+        setQueue((q) => q.slice(1)); // drop the one we ran; the effect then picks up the next
+        setBusy(false);
+        processingRef.current = false;
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queue, agent]);
 
   const status = busy ? "working" : !account ? "no wallet" : !agent ? "no agent" : funded ? "ready" : "fund me";
 
   return (
     <div className="ac">
-      <div className="ac-screen hud" ref={screenRef}>
+      <div className="ac-screen hud">
         <div className="ac-bar">
           <span>AVOW · DEEPBOOK AGENT</span>
           <div className="ac-bar-right">
@@ -155,7 +180,7 @@ export function AgentConsole() {
           </div>
         </div>
 
-        <div className="ac-log">
+        <div className="ac-log" ref={screenRef}>
           {lines.length === 0 && (
             <div className="ac-idle">
               {!account ? (
@@ -208,7 +233,23 @@ export function AgentConsole() {
               </button>
             </div>
           )}
-          {busy && <span className="ac-cursor" />}
+          {busy && (
+            <div className="ac-working" aria-label="agent working">
+              <span className="ac-work-dots">
+                <i />
+                <i />
+                <i />
+              </span>
+            </div>
+          )}
+          {/* What you've typed ahead, waiting its turn, drains top-down as the agent finishes. */}
+          {queue.slice(busy ? 1 : 0).map((q, i) => (
+            <div key={`q-${i}`} className="ac-line ac-queued">
+              <span className="ac-cmd-ps">{account ? short(account.address) : "you"}@avow:~$</span>
+              <span className="ac-queued-text">{q}</span>
+              <span className="ac-queued-tag">queued</span>
+            </div>
+          ))}
         </div>
 
         {/* The action row changes with where you are in the flow. */}
@@ -245,14 +286,13 @@ export function AgentConsole() {
             <input
               className="ac-input"
               value={instruction}
-              placeholder="tell the agent what to do…"
+              placeholder={busy ? "agent is working… type your next message" : "tell the agent what to do…"}
               spellCheck={false}
               autoFocus
-              disabled={busy}
               onChange={(e) => setInstruction(e.target.value)}
             />
-            <button className="ac-run" type="submit" disabled={busy || !instruction.trim()}>
-              {busy ? "…" : "run ▸"}
+            <button className="ac-run" type="submit" disabled={!instruction.trim()}>
+              run ▸
             </button>
           </form>
         )}

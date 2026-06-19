@@ -834,6 +834,19 @@ button {
   color: #e06f6f;
 }
 
+/* A log line that is also a link (the on-chain proof). Keeps its kind colour, adds affordance. */
+.ac-anchor {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+.ac-anchor:hover {
+  text-decoration: underline;
+  opacity: 0.85;
+}
+
 .ac-cursor {
   display: inline-block;
   width: 8px;
@@ -868,6 +881,10 @@ button {
 }
 
 .ac-mini:hover {
+  border-color: var(--green);
+  color: var(--green);
+}
+.ac-mini.is-copied {
   border-color: var(--green);
   color: var(--green);
 }

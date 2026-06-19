@@ -17,6 +17,7 @@ type LineKind = "cmd" | "sys" | "outcome" | "proof" | "err";
 interface Line {
   kind: LineKind;
   text: string;
+  href?: string; // when set, the line renders as a link (e.g. the on-chain proof)
 }
 const HZ: Record<LineKind, number> = { cmd: 600, sys: 520, outcome: 990, proof: 800, err: 300 };
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
@@ -28,23 +29,13 @@ export function AgentConsole() {
   const [lines, setLines] = useState<Line[]>([]);
   const [busy, setBusy] = useState(false);
   const [instruction, setInstruction] = useState("");
+  const [copied, setCopied] = useState(false);
   const screenRef = useRef<HTMLDivElement>(null);
 
-  const add = (kind: LineKind, text: string) => {
-    setLines((ls) => [...ls, { kind, text }]);
+  const add = (kind: LineKind, text: string, href?: string) => {
+    setLines((ls) => [...ls, { kind, text, href }]);
     beep(HZ[kind]);
   };
-  useEffect(() => {
-    screenRef.current?.scrollTo({ top: screenRef.current.scrollHeight });
-  }, [lines]);
-
-  // Reset everything if the wallet changes/disconnects, your agent is tied to your identity.
-  useEffect(() => {
-    setAgent(null);
-    setFunded(false);
-    setLines([]);
-  }, [account?.address]);
-
   const api = async (path: string, body: unknown) => {
     const res = await fetch(`${AGENT_API}${path}`, {
       method: "POST",
@@ -53,6 +44,40 @@ export function AgentConsole() {
     });
     return res.json();
   };
+  useEffect(() => {
+    screenRef.current?.scrollTo({ top: screenRef.current.scrollHeight });
+  }, [lines]);
+
+  // When a wallet connects, restore the agent it already claimed (persisted server-side) so the
+  // user picks up where they left off. The agent is tied to your identity, so disconnect clears it.
+  useEffect(() => {
+    setAgent(null);
+    setFunded(false);
+    setLines([]);
+    setCopied(false);
+    if (!account) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const out = await api("/my-agent", { owner: account.address });
+        if (cancelled || !out?.agentAddress) return;
+        setAgent({ address: out.agentAddress, mandate: out.mandateId });
+        const { sui } = await api("/balance", { agentAddress: out.agentAddress });
+        if (cancelled) return;
+        if (sui >= NEED_SUI) {
+          setFunded(true);
+          add("sys", `your agent is active — ${Number(sui).toFixed(2)} SUI ready. tell it what to do.`);
+        } else {
+          add("sys", `your agent is active. fund it: send ~${NEED_SUI} SUI, then press "check".`);
+        }
+      } catch {
+        // backend offline; the user can still claim once it is running.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [account?.address]);
 
   async function claim() {
     if (!account || busy) return;
@@ -102,7 +127,7 @@ export function AgentConsole() {
       if (out.error) add("err", `the agent refused: ${out.error}`);
       else {
         add("outcome", `✓ ${out.reasoning.outcome}`);
-        add("proof", `on-chain  ${out.swapUrl}`);
+        add("proof", "on-chain ↗ view on SuiScan", out.swapUrl);
         add("sys", "done. verify the full reasoning on Avow ▾");
       }
     } catch {
@@ -142,16 +167,31 @@ export function AgentConsole() {
               )}
             </div>
           )}
-          {lines.map((l, i) => (
-            <div key={i} className={`ac-line ac-${l.kind}`}>
-              {l.text}
-            </div>
-          ))}
+          {lines.map((l, i) =>
+            l.href ? (
+              <a key={i} className={`ac-line ac-${l.kind} ac-anchor`} href={l.href} target="_blank" rel="noreferrer">
+                {l.text}
+              </a>
+            ) : (
+              <div key={i} className={`ac-line ac-${l.kind}`}>
+                {l.text}
+              </div>
+            ),
+          )}
           {agent && !funded && (
             <div className="ac-fund">
               <span className="ac-dim">fund your agent ▸</span>
               <code>{agent.address}</code>
-              <button className="ac-mini" onClick={() => navigator.clipboard?.writeText(agent.address)}>copy</button>
+              <button
+                className={`ac-mini${copied ? " is-copied" : ""}`}
+                onClick={() => {
+                  navigator.clipboard?.writeText(agent.address);
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1600);
+                }}
+              >
+                {copied ? "copied ✓" : "copy"}
+              </button>
             </div>
           )}
           {busy && <span className="ac-cursor" />}

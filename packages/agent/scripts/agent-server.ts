@@ -9,7 +9,7 @@
 // Env: AVOW_KEY (platform key that funds plumbing), AGENT_PORT (default 8787).
 
 import { createServer, type IncomingMessage } from "node:http";
-import { readFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import { DeepBookClient } from "@mysten/deepbook-v3";
@@ -42,8 +42,40 @@ const sui = getSuiClient();
 const seal = getSealClient(sui);
 const walrus = getWalrusClient(sui);
 
-// Claimed agents this session: mandateId -> { keypair, accessId, owner }
-const agents = new Map<string, { kp: Ed25519Keypair; accessId: string; owner: string }>();
+// Claimed agents: mandateId -> { keypair, accessId, owner }. Persisted to disk so a returning
+// wallet finds its agent (and its signer survives a server restart). The file holds agent secret
+// keys, so it lives under .firecrawl/ (gitignored); fine for a testnet demo, a real deployment
+// would keep these in a KMS.
+const AGENTS_FILE = ".firecrawl/agents.json";
+type Agent = { kp: Ed25519Keypair; accessId: string; owner: string };
+
+function loadAgents(): Map<string, Agent> {
+  const m = new Map<string, Agent>();
+  if (!existsSync(AGENTS_FILE)) return m;
+  try {
+    const arr = JSON.parse(readFileSync(AGENTS_FILE, "utf8")) as Array<{ mandateId: string; secretKey: string; accessId: string; owner: string }>;
+    for (const a of arr) m.set(a.mandateId, { kp: Ed25519Keypair.fromSecretKey(a.secretKey), accessId: a.accessId, owner: a.owner });
+  } catch (e) {
+    console.error("could not read agents file:", (e as Error).message);
+  }
+  return m;
+}
+
+const agents = loadAgents();
+
+function saveAgents() {
+  const arr = [...agents.entries()].map(([mandateId, e]) => ({ mandateId, secretKey: e.kp.getSecretKey(), accessId: e.accessId, owner: e.owner }));
+  writeFileSync(AGENTS_FILE, JSON.stringify(arr, null, 2));
+}
+
+// The agent most recently claimed by this wallet, if any.
+function agentForOwner(owner: string): { agentAddress: string; mandateId: string } | null {
+  let found: { agentAddress: string; mandateId: string } | null = null;
+  for (const [mandateId, e] of agents) {
+    if (e.owner.toLowerCase() === owner.toLowerCase()) found = { agentAddress: e.kp.getPublicKey().toSuiAddress(), mandateId };
+  }
+  return found;
+}
 
 // Sign + execute, retrying on transient gas-object version races (the SDK asks to "rebuild").
 async function execWithRetry(build: () => Promise<Transaction>, signer: Ed25519Keypair, tries = 5) {
@@ -97,6 +129,7 @@ async function claim(owner: string) {
   }, kp);
 
   agents.set(m.mandateId, { kp, accessId: m.accessId, owner });
+  saveAgents();
   return { agentAddress: agentAddr, mandateId: m.mandateId };
 }
 
@@ -190,6 +223,10 @@ const server = createServer(async (req, res) => {
       const { owner } = await json(req);
       if (!owner || !String(owner).startsWith("0x")) return send(400, { error: "connect a wallet first" });
       return send(200, await claim(String(owner)));
+    }
+    if (req.method === "POST" && req.url === "/my-agent") {
+      const { owner } = await json(req);
+      return send(200, agentForOwner(String(owner)) ?? { agentAddress: null });
     }
     if (req.method === "POST" && req.url === "/balance") {
       const { agentAddress } = await json(req);

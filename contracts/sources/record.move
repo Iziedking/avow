@@ -71,6 +71,10 @@ public struct ActionAnchored has copy, drop {
     mandate_id: ID,
     access_id: ID,
     agent: address,
+    /// The user this action was taken for. For a single-user agent this is the principal; for
+    /// a shared agent it is whichever user the agent served. The evidence is sealed to this
+    /// address, so only this user (and global readers) can decrypt the reasoning behind it.
+    user: address,
     /// Walrus blob id of the Seal-encrypted evidence bundle.
     blob_id: vector<u8>,
     /// SHA-256 of the plaintext bundle, for the integrity proof.
@@ -142,6 +146,7 @@ entry fun migrate_access(access: &mut EvidenceAccess, cap: &MandateCap) {
 public fun anchor(
     m: &mut Mandate,
     access: &EvidenceAccess,
+    user: address,
     blob_id: vector<u8>,
     evidence_hash: vector<u8>,
     amount: u64,
@@ -164,6 +169,7 @@ public fun anchor(
         mandate_id: mandate::id(m),
         access_id: object::id(access),
         agent: ctx.sender(),
+        user,
         blob_id,
         evidence_hash,
         amount,
@@ -175,17 +181,34 @@ public fun anchor(
 
 // --- Seal access policy ---
 
-/// The Seal policy. Key servers dry-run a transaction that calls this function; if it does
-/// not abort, the caller is allowed the decryption key. The key-id must be prefixed by this
-/// object's id, and the caller must be an authorized reader.
+/// The Seal policy. Key servers dry-run a transaction that calls this function; if it does not
+/// abort, the caller is allowed the decryption key. This composes two of Seal's canonical
+/// patterns: an access-namespace prefix (the allowlist pattern) wrapping an account-based check
+/// (the account_based pattern), so one shared agent can serve many users with full isolation.
 ///
-/// There is deliberately no version check here: decrypting historical evidence must keep
-/// working across package upgrades, or the track record stops being verifiable. The reader
-/// set and the key-id prefix are the only gates, and both are enough.
+/// The key-id layout is `[access id][user address][nonce]`. There are two tiers of access:
+///   1. Global readers — the principal and any added auditors — decrypt every bundle under this
+///      access. This is the owner/developer, plus auditors they explicitly grant.
+///   2. Per user — anyone else decrypts only a bundle whose key-id carries their own address.
+///      No whitelist transaction is needed: a user's address IS their key, so each user sees
+///      only their own reasoning and never another user's.
+///
+/// There is deliberately no version check here: decrypting historical evidence must keep working
+/// across package upgrades, or the track record stops being verifiable.
 entry fun seal_approve(id: vector<u8>, access: &EvidenceAccess, ctx: &TxContext) {
     let sender = ctx.sender();
-    assert!(access.readers.contains(&sender), ENoAccess);
-    assert!(has_prefix(id, object::id(access).to_bytes()), ENoAccess);
+    let prefix = object::id(access).to_bytes();
+    // The key-id must live in this access's namespace.
+    assert!(has_prefix(id, prefix), ENoAccess);
+
+    // Tier 1: global readers (principal + auditors) see everything under this access.
+    if (access.readers.contains(&sender)) {
+        return
+    };
+
+    // Tier 2: account-based. The bytes right after the namespace prefix are the address the
+    // bundle was sealed to; the caller may decrypt only if that address is their own.
+    assert!(segment_eq(id, prefix.length(), sender.to_bytes()), ENoAccess);
 }
 
 // --- Read-only accessors ---
@@ -203,6 +226,22 @@ fun has_prefix(id: vector<u8>, prefix: vector<u8>): bool {
     let mut i = 0;
     while (i < prefix.length()) {
         if (prefix[i] != id[i]) {
+            return false
+        };
+        i = i + 1;
+    };
+    true
+}
+
+/// True if `segment` equals the bytes of `word` starting at `offset`. Used to match the
+/// per-user address embedded in a key-id right after the access-namespace prefix.
+fun segment_eq(word: vector<u8>, offset: u64, segment: vector<u8>): bool {
+    if (offset + segment.length() > word.length()) {
+        return false
+    };
+    let mut i = 0;
+    while (i < segment.length()) {
+        if (word[offset + i] != segment[i]) {
             return false
         };
         i = i + 1;

@@ -20,6 +20,8 @@ const PRINCIPAL: address = @0xA1;
 const AGENT: address = @0xA2;
 const AUDITOR: address = @0xA3;
 const OUTSIDER: address = @0xA4;
+// The end user a shared agent served; its evidence is sealed to this address.
+const USER: address = @0xB1;
 
 // A code for the trailing `abort` in failure tests. It is never reached when the guard
 // under test fires first, and it differs from every real error code so a missing guard
@@ -55,7 +57,7 @@ fun anchor_within_bounds_accounts_amount() {
     {
         let mut m = ts::take_shared<Mandate>(&s);
         let access = ts::take_shared<EvidenceAccess>(&s);
-        record::anchor(&mut m, &access, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+        record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
         assert!(mandate::spent_in_epoch(&m) == 500, 0);
         ts::return_shared(m);
         ts::return_shared(access);
@@ -70,7 +72,7 @@ fun per_move_cap_rejects_oversized_move() {
     s.next_tx(AGENT);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, valid_blob(), valid_hash(), 1001, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 1001, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -82,14 +84,14 @@ fun daily_cap_rejects_when_total_exceeded() {
     {
         let mut m = ts::take_shared<Mandate>(&s);
         let access = ts::take_shared<EvidenceAccess>(&s);
-        record::anchor(&mut m, &access, valid_blob(), valid_hash(), 1000, b"yield_move", b"navi", s.ctx());
+        record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 1000, b"yield_move", b"navi", s.ctx());
         ts::return_shared(m);
         ts::return_shared(access);
     };
     s.next_tx(AGENT);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, valid_blob(), valid_hash(), 600, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 600, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -100,7 +102,7 @@ fun daily_cap_resets_after_epoch_rollover() {
     {
         let mut m = ts::take_shared<Mandate>(&s);
         let access = ts::take_shared<EvidenceAccess>(&s);
-        record::anchor(&mut m, &access, valid_blob(), valid_hash(), 1000, b"yield_move", b"navi", s.ctx());
+        record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 1000, b"yield_move", b"navi", s.ctx());
         assert!(mandate::spent_in_epoch(&m) == 1000, 0);
         ts::return_shared(m);
         ts::return_shared(access);
@@ -109,7 +111,7 @@ fun daily_cap_resets_after_epoch_rollover() {
     {
         let mut m = ts::take_shared<Mandate>(&s);
         let access = ts::take_shared<EvidenceAccess>(&s);
-        record::anchor(&mut m, &access, valid_blob(), valid_hash(), 1000, b"yield_move", b"navi", s.ctx());
+        record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 1000, b"yield_move", b"navi", s.ctx());
         assert!(mandate::spent_in_epoch(&m) == 1000, 1);
         ts::return_shared(m);
         ts::return_shared(access);
@@ -124,7 +126,7 @@ fun non_agent_sender_rejected() {
     s.next_tx(OUTSIDER);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -135,7 +137,7 @@ fun expired_mandate_rejected() {
     s.next_epoch(AGENT);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -154,7 +156,7 @@ fun revoked_mandate_rejected() {
     s.next_tx(AGENT);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -165,7 +167,7 @@ fun restricted_target_not_on_allowlist_rejected() {
     s.next_tx(AGENT);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -184,7 +186,7 @@ fun restricted_target_anchors_once_allowed() {
     {
         let mut m = ts::take_shared<Mandate>(&s);
         let access = ts::take_shared<EvidenceAccess>(&s);
-        record::anchor(&mut m, &access, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+        record::anchor(&mut m, &access, USER, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
         ts::return_shared(m);
         ts::return_shared(access);
     };
@@ -254,7 +256,7 @@ fun anchor_with_foreign_access_rejected() {
     let m2_id = ts::most_recent_id_shared<Mandate>().destroy_some();
     let mut m2 = ts::take_shared_by_id<Mandate>(&s, m2_id);
     let access1 = ts::take_shared_by_id<EvidenceAccess>(&s, access1_id);
-    record::anchor(&mut m2, &access1, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m2, &access1, USER, valid_blob(), valid_hash(), 500, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -265,7 +267,7 @@ fun anchor_with_short_hash_rejected() {
     s.next_tx(AGENT);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, valid_blob(), b"0123456789012345678901234567890", 500, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, valid_blob(), b"0123456789012345678901234567890", 500, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -276,7 +278,7 @@ fun anchor_with_empty_blob_rejected() {
     s.next_tx(AGENT);
     let mut m = ts::take_shared<Mandate>(&s);
     let access = ts::take_shared<EvidenceAccess>(&s);
-    record::anchor(&mut m, &access, b"", valid_hash(), 500, b"yield_move", b"navi", s.ctx());
+    record::anchor(&mut m, &access, USER, b"", valid_hash(), 500, b"yield_move", b"navi", s.ctx());
     abort EUnreached
 }
 
@@ -364,6 +366,37 @@ fun seal_approve_rejects_wrong_prefix() {
     s.next_tx(PRINCIPAL);
     let access = ts::take_shared<EvidenceAccess>(&s);
     let id = b"this_is_not_the_access_object_id_prefix";
+    record::seal_approve(id, &access, s.ctx());
+    abort EUnreached
+}
+
+// --- Per-user (multi-tenant) access: one shared agent, isolated per user ---
+
+// A user who is not a global reader can decrypt a bundle whose key-id carries their address.
+#[test]
+fun seal_approve_allows_matching_user() {
+    let mut s = fresh(1000, 100000, 100, false);
+    s.next_tx(USER);
+    let access = ts::take_shared<EvidenceAccess>(&s);
+    // key-id = [access id][user address][nonce]
+    let mut id = object::id(&access).to_bytes();
+    id.append(USER.to_bytes());
+    id.push_back(9u8);
+    record::seal_approve(id, &access, s.ctx());
+    ts::return_shared(access);
+    s.end();
+}
+
+// A different user cannot decrypt a bundle sealed to USER, even with a valid namespace prefix.
+#[test]
+#[expected_failure(abort_code = avow::record::ENoAccess)]
+fun seal_approve_rejects_other_users_evidence() {
+    let mut s = fresh(1000, 100000, 100, false);
+    s.next_tx(OUTSIDER);
+    let access = ts::take_shared<EvidenceAccess>(&s);
+    let mut id = object::id(&access).to_bytes();
+    id.append(USER.to_bytes());
+    id.push_back(9u8);
     record::seal_approve(id, &access, s.ctx());
     abort EUnreached
 }

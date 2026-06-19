@@ -28,4 +28,5 @@ pnpm-debug.log*
 .idea/
 .DS_Store
 Thumbs.db
-../logo-concepts
+
+assets/logo-concepts/

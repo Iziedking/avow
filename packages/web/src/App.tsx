@@ -162,6 +162,9 @@ export function App() {
     const next = !devMode;
     setDevModeState(next);
     setDevMode(next);
+    // Turning it on takes you straight into the Developer Console (the toggle lives at the page
+    // bottom, so just revealing a card up top reads as "nothing happened"). Turning it off stays.
+    if (next) window.location.href = "/?dev";
   };
   const [soundMuted, setSoundMuted] = useState(() => {
     try {

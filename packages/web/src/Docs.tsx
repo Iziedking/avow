@@ -493,21 +493,66 @@ function Faq() {
 function Sdk() {
   return (
     <article className="doc-article">
-      <h2>SDK</h2>
+      <h2>Build an agent with the SDK</h2>
       <p>
-        <code>avow-sdk</code> is the programmatic way in. Your agent does whatever it does, then
-        calls <code>anchor()</code> once. An auditor service calls <code>verify()</code>. And{" "}
-        <code>createMemory()</code> gives the agent a portable brain on Walrus, <code>remember()</code>{" "}
-        and <code>recall()</code> across sessions. Proof and memory, one SDK, plain TypeScript.
+        <code>avow-sdk</code> turns any agent — a new one, or one you already run — into a stateful,
+        verifiable one. Two halves, one install: <strong>memory</strong> it carries everywhere
+        (<code>createMemory</code>), and <strong>proof</strong> of everything it did and why
+        (<code>anchor</code> / <code>verify</code>). Your model and tools stay yours; Avow wraps the
+        memory and the proof around them. Plain TypeScript, nothing to stand up.
       </p>
 
       <CodeBlock caption="install" code={`npm i avow-sdk`} />
 
-      <h3>Anchor an action</h3>
+      <h3>1 · Set the mandate (once)</h3>
       <p>
-        After the agent acts, the whole integration is one call. The clients are the connections
-        to Sui, Seal, and Walrus; <code>signer</code> is the agent key; <code>bundle</code> is the
-        evidence.
+        The owner mints a mandate — the agent's rules — and an access object, the sealed space its
+        evidence lives in. <code>createMandate</code> does both and returns their ids.
+      </p>
+      <CodeBlock
+        caption="setup.ts"
+        code={`import { getSuiClient, createMandate } from "avow-sdk";
+
+const sui = getSuiClient();
+const created = await createMandate(sui, ownerKeypair, {
+  agent: agentAddress,        // the only address allowed to anchor
+  perMoveCap: 1_000_000n,     // most it can move per action
+  dailyCap: 10_000_000n,      // most it can move per epoch
+  expiryEpoch: 100_000n,      // when the mandate stops working
+});
+
+// created.mandateId   the rulebook
+// created.accessId    the evidence vault
+// created.capId       the owner cap, keep it safe`}
+      />
+
+      <h3>2 · Give it memory it carries everywhere</h3>
+      <p>
+        One call, <code>createMemory()</code>, and the agent remembers across sessions — log out,
+        log back in, move to another machine, and the context follows it, on Walrus, scoped per
+        user. Recall before it acts; remember after, so it builds over time. Memory is a no-op until
+        you set <code>MEMWAL_PRIVATE_KEY</code> and <code>MEMWAL_ACCOUNT_ID</code> (from
+        memory.walrus.xyz), so the same code runs with or without it.
+      </p>
+      <CodeBlock
+        caption="memory.ts"
+        code={`import { createMemory } from "avow-sdk";
+
+const memory = createMemory();   // reads MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID
+
+// before acting, pull back what's relevant — even after logout, on another machine
+const context = await memory.recall(user, "what's my position, what did I buy?");
+// -> ["Bought 0.3 WAL at 0.71 SUI.", ...]
+
+// after acting, remember it so the next run builds on it
+await memory.remember(user, "Bought 0.3 WAL at 0.71 SUI.");`}
+      />
+
+      <h3>3 · Capture the reasoning, anchor the proof</h3>
+      <p>
+        After the agent acts, the whole integration is one call. The clients are the connections to
+        Sui, Seal, and Walrus; <code>signer</code> is the agent key; <code>bundle</code> is the
+        evidence, with the reasoning trace inside it.
       </p>
       <CodeBlock
         caption="anchor.ts"
@@ -554,7 +599,7 @@ const proof = await anchor({
 // proof.anchorDigest     the Sui transaction that anchored it`}
       />
 
-      <h3>Verify a record</h3>
+      <h3>4 · Verify — anyone with access, trustlessly</h3>
       <p>
         Reading is the reverse. <code>listRecords</code> gives you the anchored records,{" "}
         <code>createSession</code> proves who you are to the Seal key servers, and{" "}
@@ -585,27 +630,30 @@ const result = await verify({
 // result.bundle          the decrypted evidence, readable JSON`}
       />
 
-      <h3>Set up a mandate</h3>
+      <h3>5 · The whole loop</h3>
       <p>
-        Before an agent can anchor, the owner mints a mandate (the rules) and an access object
-        (the vault). <code>createMandate</code> does both and returns their ids.
+        Put together, every turn the agent recalls, decides, acts, proves, and remembers. That is an
+        Avow agent: stateful and provable, end to end — and the model and tools in the middle are
+        still entirely yours.
       </p>
       <CodeBlock
-        caption="setup.ts"
-        code={`import { getSuiClient, createMandate } from "avow-sdk";
+        caption="agent.ts"
+        code={`// each turn the agent runs:
+const context = await memory.recall(user, instruction);    // 1. remember the past
+const plan    = await yourModel(instruction, context);     // 2. decide — your agent, your model
+const digest  = await plan.execute();                      // 3. act for real
 
-const sui = getSuiClient();
-const created = await createMandate(sui, ownerKeypair, {
-  agent: agentAddress,        // the only address allowed to anchor
-  perMoveCap: 1_000_000n,     // most it can move per action
-  dailyCap: 10_000_000n,      // most it can move per epoch
-  expiryEpoch: 100_000n,      // when the mandate stops working
-});
+await anchor({ suiClient, sealClient, walrusClient, signer: agent,
+  mandateId, accessId,
+  bundle: { ...plan.evidence, txDigests: [digest] } });    // 4. prove it, sealed on Walrus
 
-// created.mandateId   the rulebook
-// created.accessId    the evidence vault
-// created.capId       the owner cap, keep it safe`}
+await memory.remember(user, plan.summary);                 // 5. remember it, on Walrus`}
       />
+      <p className="doc-muted">
+        Drop these into a fresh agent or wrap one you already run. Everything an agent does this way
+        is the same <code>anchor()</code> / <code>verify()</code> the CLI and this dashboard use, so
+        a proof made in code verifies in the browser, and the other way around.
+      </p>
     </article>
   );
 }

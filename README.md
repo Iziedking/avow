@@ -196,7 +196,8 @@ plugs in, and a deterministic parser is the fallback): it reads the instruction,
 from your words, and trades on DeepBook for real. Start the agent backend alongside the dashboard:
 
 ```bash
-# optional: add ANTHROPIC_API_KEY=sk-ant-... to .env to use Claude (else a rule-based parser)
+# .env: ANTHROPIC_API_KEY=sk-ant-... for Claude (else a rule-based parser), and
+#       MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID (from memory.walrus.xyz) to turn on memory
 npx tsx packages/agent/scripts/agent-server.ts   # the agent backend, signs trades autonomously
 npm -w @avow/web run dev                          # the dashboard and the console
 ```
@@ -207,12 +208,17 @@ Open `/?console`, connect a wallet, and:
    Because it is built with the Avow SDK, at claim time it grants your wallet read access.
 2. **Fund** it with a little SUI, its trading capital. The platform seeds the tiny DEEP and WAL it
    needs for fees and storage, so trading never waits on a thin pool.
-3. **Instruct** it in plain English. The rule comes from your words, not a hardcoded cap:
-   `swap 1 SUI to USDC` does exactly 1 SUI, `buy SUI but don't spend above 5 USDC` is enforced and
-   recorded in the proof. The agent reads the live market, plans with Claude, and acts: market
-   swaps across SUI / USDC / DEEP / USDT / BTC (auto-routing, bridging through USDC when needed),
-   resting limit orders, or moving funds in and out of its vault, then seals the full reasoning.
-4. **Verify** on the Avow home with the same wallet. Your records decrypt for you alone; a
+3. **Instruct** it in plain English, and it talks back. The rule comes from your words, not a
+   hardcoded cap: `swap 1 SUI to USDC` does exactly 1 SUI, `buy SUI but don't spend above 5 USDC`
+   is enforced and recorded in the proof. It reads the live market, plans with Claude, and acts:
+   market swaps across SUI / USDC / DEEP / USDT / BTC / WAL (auto-routing, bridging through USDC
+   when needed), resting limit orders, or moving funds in and out of its vault, then seals the
+   full reasoning. If it can't do something it says why and suggests an alternative, never a dead end.
+4. **It remembers.** Before acting, the agent recalls its own history from Walrus, so it builds
+   over time: `buy 0.3 WAL` opens a position it remembers, and a later `sell my WAL for profit`
+   recalls the entry price, checks the market, and only sells if it is genuinely up. State that
+   survives sessions, portable and verifiable.
+5. **Verify** on the Avow home with the same wallet. Your records decrypt for you alone; a
    different wallet is refused by the Seal key servers.
 
 The console stays deliberately terse, a "done" and a link to the transaction. The full reasoning
@@ -378,14 +384,20 @@ dashboard reconciles each anchored amount against the transfers those digests de
 state this plainly because the honest version is also the stronger one. Hard on-chain
 enforcement, where the mandate custodies funds, is the natural next step.
 
-## Why not just store memory on Walrus
+## Memory on Walrus, with proof on top
 
-The Walrus track is about agent memory and verifiable data. Avow's anchored evidence log is
-exactly that: a durable, portable, verifiable record an agent and its auditors build over
-time. MemWal is the off-the-shelf way to put agent memory on Walrus, and you could store the
-same bundles with it. Avow adds the three things a money-moving agent actually needs on top of
-storage: an integrity proof bound on chain, authority bounds the record cannot violate, and
-selective disclosure through Seal so the strategy stays private while staying verifiable.
+The Walrus track is about agent memory and verifiable data, and Avow uses both layers together.
+The agent's working memory runs on **MemWal (Walrus Memory)**: it remembers each trade and recalls
+its own history before it acts, so it tracks state across sessions and builds over time, exactly
+the long-running, stateful behavior the track asks for. The memory is not just stored, it is read
+and acted on, the agent's positions and prior decisions inform the next one.
+
+On top of that, every action and its full reasoning is anchored as an Avow evidence record. That
+is what raw storage (or MemWal alone) does not give a money-moving agent: an integrity proof bound
+on chain, authority bounds the record cannot violate, and selective disclosure through Seal so the
+strategy stays private while staying verifiable, per user. **MemWal for what the agent remembers,
+Avow for proving what it did.** Both are durable, portable, and not locked to our app, the
+foundation the track is built on.
 
 ## A note on amounts: MIST
 

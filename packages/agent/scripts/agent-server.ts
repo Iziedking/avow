@@ -294,34 +294,41 @@ async function devVerify(owner: string, mandateId: string) {
 async function devDemo() {
   const PER_MOVE = 5000n;
   const AMOUNT = "1500";
-
-  // 1. create-mandate: the platform is the agent so it can anchor in this self-contained demo.
-  const m = await withRetry(() => createMandate(sui, platform, {
-    agent: platformAddr,
-    perMoveCap: PER_MOVE,
-    dailyCap: 100_000n,
-    expiryEpoch: 100000n,
-  }));
-  // Let the node index the new mandate and access before the anchor references them.
-  await waitForObject(m.mandateId);
-  await waitForObject(m.accessId);
-
-  // 2. anchor: capture the reasoning, seal it, stamp it on chain.
   const reasoning = new Reasoning("Pay the invoice the user approved")
     .observe("Read the invoice", "Stripe invoice inv_42 for 1500")
     .decide("Approved and paid", "the user pre-approved this invoice")
     .build("Paid Stripe 1500");
-  const proof = await withRetry(() => anchor({
-    suiClient: sui, sealClient: seal, walrusClient: walrus, signer: platform,
-    mandateId: m.mandateId, accessId: m.accessId,
-    bundle: {
-      version: EVIDENCE_VERSION, mandateId: m.mandateId, agent: platformAddr, user: platformAddr,
-      reasoning, actionType: "payment", target: "stripe", amount: AMOUNT,
-      rationale: "Paid the invoice the user approved.",
-      observed: { invoiceId: "inv_42" }, before: {}, after: {}, txDigests: [], timestampMs: Date.now(),
-    },
-  }));
-  if (!proof?.blobId) throw new Error("the anchor did not complete (a transient Walrus or RPC hiccup); run demo again");
+
+  // create-mandate + anchor as one self-healing unit. The public RPC is load-balanced, so a brand
+  // new mandate can briefly look like it "does not exist" to the node the anchor hits. If anything
+  // in this block trips, we redo it from a fresh mandate (orphaned attempts are harmless), so the
+  // live demo never needs a re-type. Retries on ANY error since the whole block is safe to repeat.
+  let m!: Awaited<ReturnType<typeof createMandate>>;
+  let proof!: Awaited<ReturnType<typeof anchor>>;
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      m = await createMandate(sui, platform, { agent: platformAddr, perMoveCap: PER_MOVE, dailyCap: 100_000n, expiryEpoch: 100000n });
+      await waitForObject(m.mandateId);
+      await waitForObject(m.accessId);
+      proof = await anchor({
+        suiClient: sui, sealClient: seal, walrusClient: walrus, signer: platform,
+        mandateId: m.mandateId, accessId: m.accessId,
+        bundle: {
+          version: EVIDENCE_VERSION, mandateId: m.mandateId, agent: platformAddr, user: platformAddr,
+          reasoning, actionType: "payment", target: "stripe", amount: AMOUNT,
+          rationale: "Paid the invoice the user approved.",
+          observed: { invoiceId: "inv_42" }, before: {}, after: {}, txDigests: [], timestampMs: Date.now(),
+        },
+      });
+      if (!proof?.blobId) throw new Error("anchor returned no blob");
+      break; // success
+    } catch (e) {
+      lastErr = e;
+      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
+    }
+  }
+  if (!proof?.blobId) throw new Error(`the demo could not complete after retries: ${(lastErr as Error)?.message ?? "unknown"}`);
 
   // 3. records + 4. verify: read it back and check it the way an auditor would.
   const records = await listRecords(sui, m.mandateId, 5);

@@ -512,6 +512,10 @@ export function App() {
               <span className="brand-line">proof, not trust</span>
             </div>
           </div>
+          <nav className="masthead-nav">
+            <a href="/?console">Console</a>
+            {mode === "build" && <a href="/?dev">Dev</a>}
+          </nav>
           <div className="masthead-actions">
             <div className="settings" ref={settingsRef}>
               <button

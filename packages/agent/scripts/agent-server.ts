@@ -114,20 +114,34 @@ function agentForOwner(owner: string): { agentAddress: string; mandateId: string
 // MandateCap for each mandate is held by its agent (it created the mandate), and the server holds
 // the agent keys, so it signs on the connecting owner's authority. ----
 
-function ownerMandates(owner: string) {
-  const out: { mandateId: string; agentAddress: string; accessId: string }[] = [];
+// The mandates a wallet can administer: ones the backend claimed for it (it holds the agent key),
+// plus, when the platform wallet itself connects, the mandates it owns on chain (the seeded demos
+// and anything `demo` created). This makes the dev console show what the dashboard shows.
+async function ownerMandates(owner: string): Promise<{ mandateId: string; agentAddress: string }[]> {
+  const seen = new Set<string>();
+  const out: { mandateId: string; agentAddress: string }[] = [];
   for (const [mandateId, e] of agents) {
-    if (e.owner.toLowerCase() === owner.toLowerCase())
-      out.push({ mandateId, agentAddress: e.kp.getPublicKey().toSuiAddress(), accessId: e.accessId });
+    if (e.owner.toLowerCase() === owner.toLowerCase()) {
+      out.push({ mandateId, agentAddress: e.kp.getPublicKey().toSuiAddress() });
+      seen.add(mandateId);
+    }
+  }
+  if (owner.toLowerCase() === platformAddr.toLowerCase()) {
+    try {
+      const caps = await sui.getOwnedObjects({ owner: platformAddr, filter: { StructType: `${PACKAGE_ID}::mandate::MandateCap` }, options: { showContent: true } });
+      for (const o of caps.data) {
+        const f = (o.data?.content as { fields?: Record<string, unknown> } | undefined)?.fields;
+        const mandateId = f && String(f.mandate_id);
+        if (mandateId && !seen.has(mandateId)) {
+          out.push({ mandateId, agentAddress: platformAddr });
+          seen.add(mandateId);
+        }
+      }
+    } catch {
+      /* cap read failed; fall back to claimed agents only */
+    }
   }
   return out;
-}
-
-function ownedEntry(owner: string, mandateId: string) {
-  const e = agents.get(mandateId);
-  if (!e) throw new Error("unknown mandate");
-  if (e.owner.toLowerCase() !== owner.toLowerCase()) throw new Error("that mandate is not yours to administer");
-  return e;
 }
 
 async function capIdForAgent(agentAddr: string, mandateId: string): Promise<string> {
@@ -139,9 +153,33 @@ async function capIdForAgent(agentAddr: string, mandateId: string): Promise<stri
   throw new Error("MandateCap not found for that mandate");
 }
 
+// The evidence access for a mandate, from its AccessCreated event.
+async function accessIdForMandate(mandateId: string): Promise<string> {
+  const res = await sui.queryEvents({ query: { MoveEventType: `${PACKAGE_ID}::record::AccessCreated` }, order: "descending", limit: 50 });
+  const ev = res.data.find((e) => String((e.parsedJson as Record<string, unknown>).mandate_id) === mandateId);
+  if (!ev) throw new Error("no evidence access for that mandate");
+  return String((ev.parsedJson as Record<string, unknown>).access_id);
+}
+
+// How to administer a mandate: the key that signs (the claimed agent's key, or the platform key
+// when the platform owns the cap), plus the cap and access ids.
+async function adminContext(owner: string, mandateId: string): Promise<{ signer: Ed25519Keypair; capId: string; accessId: string }> {
+  const e = agents.get(mandateId);
+  if (e && e.owner.toLowerCase() === owner.toLowerCase()) {
+    const capId = await capIdForAgent(e.kp.getPublicKey().toSuiAddress(), mandateId);
+    return { signer: e.kp, capId, accessId: e.accessId };
+  }
+  if (owner.toLowerCase() === platformAddr.toLowerCase()) {
+    const capId = await capIdForAgent(platformAddr, mandateId); // platform holds the cap for its mandates
+    const accessId = await accessIdForMandate(mandateId);
+    return { signer: platform, capId, accessId };
+  }
+  throw new Error("that mandate is not yours to administer");
+}
+
 // List the owner's mandates with on-chain status: revoked? how many proofs anchored?
 async function devMandates(owner: string) {
-  const mine = ownerMandates(owner);
+  const mine = (await ownerMandates(owner)).slice(0, 15); // cap the list so the lookups stay quick
   const mandates = await Promise.all(
     mine.map(async (m) => {
       let revoked = false;
@@ -166,27 +204,25 @@ async function devMandates(owner: string) {
   return { admin: owner, platform: platformAddr, isPlatform: owner.toLowerCase() === platformAddr.toLowerCase(), mandates };
 }
 
-// Grant an auditor read access (record::add_auditor), signed by the agent cap on the owner's authority.
+// Grant an auditor read access (record::add_auditor), signed by the cap on the owner's authority.
 async function devGrant(owner: string, mandateId: string, auditor: string) {
-  const e = ownedEntry(owner, mandateId);
-  const capId = await capIdForAgent(e.kp.getPublicKey().toSuiAddress(), mandateId);
+  const { signer, capId, accessId } = await adminContext(owner, mandateId);
   const res = await execWithRetry(async () => {
     const tx = new Transaction();
-    tx.moveCall({ target: `${PACKAGE_ID}::record::add_auditor`, arguments: [tx.object(e.accessId), tx.object(capId), tx.pure.address(auditor)] });
+    tx.moveCall({ target: `${PACKAGE_ID}::record::add_auditor`, arguments: [tx.object(accessId), tx.object(capId), tx.pure.address(auditor)] });
     return tx;
-  }, e.kp);
+  }, signer);
   return { ok: true, mandateId, auditor, digest: res!.digest };
 }
 
 // The owner's kill switch: revoke the whole mandate (mandate::revoke); the agent can no longer act.
 async function devRevoke(owner: string, mandateId: string) {
-  const e = ownedEntry(owner, mandateId);
-  const capId = await capIdForAgent(e.kp.getPublicKey().toSuiAddress(), mandateId);
+  const { signer, capId } = await adminContext(owner, mandateId);
   const res = await execWithRetry(async () => {
     const tx = new Transaction();
     tx.moveCall({ target: `${PACKAGE_ID}::mandate::revoke`, arguments: [tx.object(mandateId), tx.object(capId)] });
     return tx;
-  }, e.kp);
+  }, signer);
   return { ok: true, mandateId, digest: res!.digest };
 }
 
@@ -194,11 +230,11 @@ async function devRevoke(owner: string, mandateId: string) {
 // recompute the hash, check it sits within the mandate. The agent is a valid reader of its own
 // evidence, so the server can run verify() end to end as a live SDK demo.
 async function devVerify(owner: string, mandateId: string) {
-  const e = ownedEntry(owner, mandateId);
+  const { signer } = await adminContext(owner, mandateId); // a global reader of this mandate's evidence
   const records = await listRecords(sui, mandateId, 10);
   if (!records.length) throw new Error("no proofs anchored for this mandate yet; instruct the agent first");
   const record = records[0];
-  const sessionKey = await createSession(sui, e.kp);
+  const sessionKey = await createSession(sui, signer);
   const r = await verify({ suiClient: sui, sealClient: seal, walrusClient: walrus, sessionKey, record });
   const reasoning = r.bundle.reasoning as { goal?: string; steps?: { title: string }[] } | undefined;
   return {

@@ -278,7 +278,10 @@ export function DevConsole() {
     <div className="ac">
       <div className="ac-screen hud">
         <div className="ac-bar">
-          <span>AVOW · DEVELOPER CONSOLE</span>
+          <div className="ac-bar-left">
+            <a className="ac-home" href="/">‹ home</a>
+            <span>AVOW · DEVELOPER CONSOLE</span>
+          </div>
           <div className="ac-bar-right">
             <span>{busy ? "working" : account ? "admin" : "no wallet"}</span>
             <WalletConnect />

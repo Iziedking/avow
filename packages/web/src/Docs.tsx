@@ -689,6 +689,14 @@ export AVOW_NETWORK=testnet      # the default, set mainnet to switch`}
 export AVOW_MANDATE_ID=0x...  AVOW_ACCESS_ID=0x...`}
       />
 
+      <h3>Authorize an auditor</h3>
+      <p>
+        You hold the mandate cap, so you decide who else may read the evidence. <code>grant</code>{" "}
+        adds an auditor wallet as a reader — it finds the access and your cap for you. That wallet
+        can then decrypt and verify the records itself, and nothing more.
+      </p>
+      <CodeBlock caption="grant" code={`avow grant --mandate $AVOW_MANDATE_ID --auditor 0xAUDITOR`} />
+
       <h3>Log an action, and prove it</h3>
       <p>Run as the agent. A move that breaks the mandate will not anchor at all.</p>
       <CodeBlock

@@ -6,6 +6,7 @@
 //
 //   avow create-mandate --agent 0x.. --per-move 1000000 --daily 10000000
 //   avow anchor --mandate 0x.. --access 0x.. --action payment --target stripe --amount 1500 --rationale "paid invoice"
+//   avow grant --mandate 0x.. --auditor 0x..
 //   avow verify --mandate 0x..
 //   avow records --mandate 0x..
 //
@@ -15,6 +16,7 @@
 import { parseArgs } from "node:util";
 import { readFileSync } from "node:fs";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
+import { Transaction } from "@mysten/sui/transactions";
 import {
   getSuiClient,
   getSealClient,
@@ -26,6 +28,7 @@ import {
   listRecords,
   EVIDENCE_VERSION,
   NETWORK,
+  PACKAGE_ID,
   type EvidenceBundle,
 } from "avow-sdk";
 
@@ -36,6 +39,7 @@ Usage: avow <command> [options]
 Commands:
   create-mandate   Set what an agent may do and stand up its evidence access
   anchor           Anchor an agent action as verifiable evidence
+  grant            Authorize an auditor wallet to read and verify this mandate
   verify           Decrypt and verify a mandate's anchored records
   records          List a mandate's anchored records (read-only, no key needed)
   help             Show this help
@@ -46,6 +50,7 @@ Network: AVOW_NETWORK=testnet      AVOW_PACKAGE_ID=0x... to override the package
 Examples:
   avow create-mandate --agent 0xAGENT --per-move 1000000 --daily 10000000
   avow anchor --mandate 0xM --access 0xA --action payment --target stripe --amount 1500 --rationale "paid invoice"
+  avow grant --mandate 0xM --auditor 0xAUDITOR
   avow verify --mandate 0xM
   avow records --mandate 0xM
 `;
@@ -63,6 +68,7 @@ function parseCliArgs() {
         restrict: { type: "boolean" },
         mandate: { type: "string" },
         access: { type: "string" },
+        auditor: { type: "string" },
         action: { type: "string" },
         target: { type: "string" },
         amount: { type: "string" },
@@ -164,6 +170,60 @@ async function cmdAnchor() {
   console.log(`  proof: ${suiscan(proof.anchorDigest)}`);
 }
 
+// The evidence access for a mandate, found from its AccessCreated event. Pass --access to skip.
+async function accessIdFor(sui: ReturnType<typeof getSuiClient>, mandateId: string): Promise<string> {
+  const res = await sui.queryEvents({
+    query: { MoveEventType: `${PACKAGE_ID}::record::AccessCreated` },
+    order: "descending",
+    limit: 50,
+  });
+  const ev = res.data.find((e) => String((e.parsedJson as Record<string, unknown>).mandate_id) === mandateId);
+  if (!ev) fail(`no evidence access found for mandate ${mandateId}`);
+  return String((ev.parsedJson as Record<string, unknown>).access_id);
+}
+
+// The MandateCap this key holds for a mandate — the authority to grant. Only the owner who created
+// the mandate holds it.
+async function capIdFor(sui: ReturnType<typeof getSuiClient>, owner: string, mandateId: string): Promise<string> {
+  const res = await sui.getOwnedObjects({
+    owner,
+    filter: { StructType: `${PACKAGE_ID}::mandate::MandateCap` },
+    options: { showContent: true },
+  });
+  for (const o of res.data) {
+    const c = o.data?.content;
+    if (c && c.dataType === "moveObject") {
+      const f = (c as { fields: Record<string, unknown> }).fields;
+      if (String(f.mandate_id) === mandateId) return o.data!.objectId;
+    }
+  }
+  fail(`this key holds no MandateCap for ${mandateId} — only the owner who created the mandate can grant`);
+}
+
+async function cmdGrant() {
+  const signer = keypair();
+  const mandateId = need("mandate");
+  const auditor = values.auditor;
+  if (!auditor) fail("--auditor is required (the wallet to authorize)");
+  const sui = getSuiClient();
+  const owner = signer.getPublicKey().toSuiAddress();
+
+  // Find the access (auto, or --access) and the cap this key holds, then authorize the auditor.
+  const accessId = values.access ?? (await accessIdFor(sui, mandateId));
+  const capId = await capIdFor(sui, owner, mandateId);
+
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::record::add_auditor`,
+    arguments: [tx.object(accessId), tx.object(capId), tx.pure.address(auditor)],
+  });
+  const res = await sui.signAndExecuteTransaction({ transaction: tx, signer, options: { showEffects: true } });
+  if (res.effects?.status?.status !== "success") fail(res.effects?.status?.error ?? "grant failed");
+  console.log(`granted. ${auditor}`);
+  console.log(`can now decrypt and verify this mandate's records with their own wallet.`);
+  console.log(`  proof: ${suiscan(res.digest)}`);
+}
+
 async function cmdRecords() {
   const mandateId = need("mandate");
   const sui = getSuiClient();
@@ -220,6 +280,8 @@ async function main() {
       return cmdCreateMandate();
     case "anchor":
       return cmdAnchor();
+    case "grant":
+      return cmdGrant();
     case "verify":
       return cmdVerify();
     case "records":

@@ -441,8 +441,8 @@ records US cents, where `1599` is $15.99).
 
 Testnet:
 
-- Package: `0xace239ce0defd77ce0c4e570233b37a86ac53377a38ae59749feda3ec9715667`
-- Shared bill payer mandate: `0x80d5da99a1d51ed92fbc9cee907ce9b7c7c666b54751ec527108481984a7f32c`
+- Package: `0x4f3e25d7858a70ce4f1a437a3f91f24700407f52c68bb93775522d752841a3ee`
+- Shared bill payer mandate: `0xed07c664a788e3912570d4e268fb4c8e04cdebb01fb020b5a4dff1ace2654b25`
 
 
 ## License

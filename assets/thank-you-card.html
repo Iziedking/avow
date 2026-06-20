@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Avow — Thank You</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Saira+Stencil+One&family=Orbitron:wght@500;700&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #050a07;
+        --ink: #07110c;
+        --green: #5fd08a;
+        --green-bright: #74e09c;
+        --green-dim: #3f7d5c;
+        --line: rgba(95, 208, 138, 0.14);
+        --text: #e8efe9;
+        --faint: #2c4438;
+        --mono: "IBM Plex Mono", monospace;
+        --stencil: "Saira Stencil One", "IBM Plex Mono", monospace;
+        --display: "Orbitron", sans-serif;
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        background: #000;
+        display: grid;
+        place-items: center;
+        min-height: 100vh;
+        font-family: var(--mono);
+      }
+
+      /* Screenshot this element at 1920x1080 (it is exactly 16:9). */
+      .card {
+        position: relative;
+        width: 1920px;
+        height: 1080px;
+        background:
+          radial-gradient(1200px 700px at 50% 38%, rgba(95, 208, 138, 0.1), transparent 70%),
+          radial-gradient(900px 900px at 84% 88%, rgba(95, 208, 138, 0.05), transparent 70%),
+          linear-gradient(180deg, #06100b, #040806 70%);
+        overflow: hidden;
+        color: var(--text);
+      }
+
+      /* Subtle grid. */
+      .card::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background-image:
+          linear-gradient(var(--line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--line) 1px, transparent 1px);
+        background-size: 64px 64px;
+        mask-image: radial-gradient(1300px 760px at 50% 44%, #000 30%, transparent 78%);
+        opacity: 0.5;
+      }
+
+      /* Grain. */
+      .card::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        opacity: 0.05;
+        background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+      }
+
+      /* Giant faint A watermark. */
+      .watermark {
+        position: absolute;
+        right: -120px;
+        bottom: -200px;
+        width: 1000px;
+        height: 1000px;
+        opacity: 0.06;
+        transform: rotate(-2deg);
+      }
+      .watermark path {
+        stroke: var(--green);
+      }
+
+      /* Corner ticks, the HUD frame. */
+      .frame {
+        position: absolute;
+        inset: 56px;
+        pointer-events: none;
+      }
+      .frame span {
+        position: absolute;
+        width: 46px;
+        height: 46px;
+        border-color: var(--green-dim);
+        border-style: solid;
+        opacity: 0.55;
+      }
+      .frame .tl { top: 0; left: 0; border-width: 2px 0 0 2px; }
+      .frame .tr { top: 0; right: 0; border-width: 2px 2px 0 0; }
+      .frame .bl { bottom: 0; left: 0; border-width: 0 0 2px 2px; }
+      .frame .br { bottom: 0; right: 0; border-width: 0 2px 2px 0; }
+
+      .stage {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 30px;
+        text-align: center;
+      }
+
+      /* The mark, with a glow and a stamped check. */
+      .mark {
+        width: 132px;
+        height: 132px;
+        filter: drop-shadow(0 0 26px rgba(95, 208, 138, 0.55));
+        animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+      }
+
+      .wordmark {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 132px;
+        letter-spacing: 6px;
+        color: #f4faf6;
+        text-shadow: 0 0 40px rgba(95, 208, 138, 0.45);
+        line-height: 1;
+        animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.08s both;
+      }
+
+      .divider {
+        width: 120px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--green), transparent);
+        opacity: 0.7;
+        animation: grow 0.7s ease 0.2s both;
+      }
+
+      .thanks {
+        font-family: var(--stencil);
+        font-size: 86px;
+        letter-spacing: 4px;
+        color: var(--green-bright);
+        text-transform: uppercase;
+        text-shadow: 0 0 38px rgba(95, 208, 138, 0.4);
+        animation: rise 0.8s cubic-bezier(0.2, 0.8, 0.2, 1) 0.28s both;
+      }
+
+      .tagline {
+        font-family: var(--mono);
+        font-size: 30px;
+        letter-spacing: 10px;
+        text-transform: uppercase;
+        color: var(--green);
+        opacity: 0.92;
+        animation: rise 0.8s ease 0.4s both;
+      }
+
+      .meta {
+        margin-top: 22px;
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        font-family: var(--mono);
+        font-size: 22px;
+        letter-spacing: 3px;
+        text-transform: uppercase;
+        color: var(--faint);
+        animation: rise 0.8s ease 0.52s both;
+      }
+      .meta .dot {
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: var(--green-dim);
+      }
+      .meta .site {
+        color: var(--green);
+      }
+
+      @keyframes rise {
+        from { opacity: 0; transform: translateY(22px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      @keyframes grow {
+        from { opacity: 0; transform: scaleX(0); }
+        to { opacity: 0.7; transform: scaleX(1); }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <!-- faint A watermark -->
+      <svg class="watermark" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+        <path d="M150 392 L256 120 L362 392" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+
+      <div class="frame">
+        <span class="tl"></span><span class="tr"></span><span class="bl"></span><span class="br"></span>
+      </div>
+
+      <div class="stage">
+        <svg class="mark" viewBox="0 0 512 512" fill="none" aria-hidden="true">
+          <path d="M150 392 L256 120 L362 392" stroke="#5fd08a" stroke-width="30" stroke-linecap="round" stroke-linejoin="round" />
+          <path d="M196 300 L238 342 L322 236" stroke="#74e09c" stroke-width="26" stroke-linecap="round" stroke-linejoin="round" />
+        </svg>
+
+        <div class="wordmark">avow</div>
+        <div class="divider"></div>
+        <div class="thanks">Thank you for watching</div>
+        <div class="tagline">proof, not trust</div>
+
+        <div class="meta">
+          <span class="site">avow.site</span>
+          <span class="dot"></span>
+          <span>Sui Overflow 2026</span>
+          <span class="dot"></span>
+          <span>Walrus track</span>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

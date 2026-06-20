@@ -46,6 +46,9 @@ export async function listRecords(
         epoch: String(j.epoch),
         txDigest: e.id.txDigest,
         timestampMs: Number(e.timestampMs ?? 0),
+        // Forensic fields, present on records anchored after the forensic upgrade.
+        withinMandate: j.within_mandate === undefined ? undefined : Boolean(j.within_mandate),
+        breaches: j.breaches === undefined ? undefined : Number(j.breaches),
       };
     })
     .filter((r) => r.mandateId === mandateId);

@@ -120,6 +120,24 @@ function loadUser(envName: string): Ed25519Keypair {
   return k ? Ed25519Keypair.fromSecretKey(k) : new Ed25519Keypair();
 }
 
+// The public RPC lags a tx or two behind, so back-to-back signs on one gas coin race
+// ("unavailable for consumption"). Retry with backoff so the seed runs unattended.
+async function withRetry<T>(fn: () => Promise<T>, tries = 7): Promise<T> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (i < tries - 1 && /unavailable for consumption|needs to be rebuilt|reserved|equivocat|not available/i.test(msg)) {
+        await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error("retries exhausted");
+}
+
 async function main() {
   const keypair = loadKeypair();
   const address = keypair.getPublicKey().toSuiAddress();
@@ -167,14 +185,17 @@ async function main() {
 
       let txDigests: string[] = [];
       if (pay) {
-        const tx = new Transaction();
-        const [coin] = tx.splitCoins(tx.gas, [1]);
-        tx.transferObjects([coin], address);
-        const tr = await sui.signAndExecuteTransaction({ transaction: tx, signer: keypair });
+        const tr = await withRetry(async () => {
+          const tx = new Transaction();
+          const [coin] = tx.splitCoins(tx.gas, [1]);
+          tx.transferObjects([coin], address);
+          return sui.signAndExecuteTransaction({ transaction: tx, signer: keypair });
+        });
+        await sui.waitForTransaction({ digest: tr.digest });
         txDigests = [tr.digest];
       }
 
-      const result = await anchor({
+      const result = await withRetry(() => anchor({
         suiClient: sui,
         sealClient: seal,
         walrusClient: walrus,
@@ -202,7 +223,7 @@ async function main() {
           txDigests,
           timestampMs: Date.now(),
         },
-      });
+      }));
 
       if (pay) paid += 1;
       else refused += 1;
@@ -211,9 +232,41 @@ async function main() {
     }
   }
 
+  // A deliberate MISSTEP, to show the forensic log. The agent pays Alice's rent of 8000, over her
+  // 5000 per-payment cap. A careful agent refuses; this one slipped. The contract records it anyway
+  // and stamps it OUT OF BOUNDS on chain, so you can see exactly where the agent went wrong, replay
+  // its (flawed) reasoning, and adjust, instead of the misstep simply vanishing.
+  {
+    const misstep = new Reasoning("Pay Alice's rent bill");
+    misstep.observe("Received the rent bill", "Billed 8000, the usual is 8000", { merchant: "rent", billed: 8000, usual: 8000 });
+    misstep.tool("Checked the biller", "rent looks routine and recurring", { approved: true });
+    misstep.think("Glanced at the amount", "8000 matches the usual, so treated it as safe — missed that it is over the 5000 per-payment cap", { amount: 8000, perPaymentCap: PER_PAYMENT_CAP });
+    misstep.decide("Paid", "Paid rent 8000: routine and matches the usual.");
+    const tr = await withRetry(async () => {
+      const tx = new Transaction();
+      const [coin] = tx.splitCoins(tx.gas, [1]);
+      tx.transferObjects([coin], address);
+      return sui.signAndExecuteTransaction({ transaction: tx, signer: keypair });
+    });
+    await sui.waitForTransaction({ digest: tr.digest });
+    const out = await withRetry(() => anchor({
+      suiClient: sui, sealClient: seal, walrusClient: walrus, signer: keypair, mandateId, accessId,
+      bundle: {
+        version: EVIDENCE_VERSION, mandateId, agent: address, user: consumers[0].address,
+        reasoning: misstep.build("Paid rent 8000"),
+        actionType: "payment", target: "rent", amount: "8000",
+        rationale: "Paid rent 8000: routine and matches the usual.",
+        observed: { merchant: "rent", billed: 8000, usual: 8000, approved: true },
+        before: {}, after: {}, txDigests: [tr.digest], timestampMs: Date.now(),
+      },
+    }));
+    console.log(`  MISSTEP paid rent 8000 (over the 5000 cap) -> recorded and flagged OUT OF BOUNDS`);
+    console.log(`          proof: https://suiscan.xyz/${NETWORK}/tx/${out.anchorDigest}`);
+  }
+
   console.log("\n-----------------------------------------------------------");
-  console.log(`done. ${paid} paid, ${refused} refused across 2 consumers, each decision recorded,`);
-  console.log(`reasoned, and sealed to its user.`);
+  console.log(`done. ${paid} paid, ${refused} refused, plus 1 out-of-bounds misstep, across 2 consumers,`);
+  console.log(`each decision recorded, reasoned, and sealed to its user.`);
   console.log(`\nmandate id (paste in the dashboard): ${mandateId}`);
 }
 

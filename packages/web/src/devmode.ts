@@ -1,22 +1,11 @@
-// Developer mode: off by default, so consumers never see the developer surface. A developer flips
-// it on and it persists in localStorage, which reveals the Developer Console (its CTA on the home
-// page and its /?dev route). Read by the router (main.tsx) and the landing footer (App.tsx).
-
-const KEY = "avow:devmode";
+// Developer mode is the dashboard's existing build/verify switch (Settings -> Developer mode),
+// persisted as "avow-mode". When it's on (build), the developer surface shows: the build dashboard,
+// the Developer Console card, and the /?dev route. One flag, one switch, read here by the router.
 
 export function isDevMode(): boolean {
   try {
-    return localStorage.getItem(KEY) === "1";
+    return localStorage.getItem("avow-mode") === "build";
   } catch {
     return false;
-  }
-}
-
-export function setDevMode(on: boolean): void {
-  try {
-    if (on) localStorage.setItem(KEY, "1");
-    else localStorage.removeItem(KEY);
-  } catch {
-    /* localStorage unavailable; dev mode just won't persist this session */
   }
 }

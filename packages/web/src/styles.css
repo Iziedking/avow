@@ -1576,6 +1576,18 @@ input:focus {
   font-weight: 600;
 }
 
+/* Verified and unaltered, but the on-chain verdict flagged it out of bounds. */
+.verify-result.flagged {
+  border-left: 2px solid var(--amber);
+  background: var(--ink-850);
+  color: var(--text);
+  animation: rise 0.4s ease both;
+}
+.verify-result.flagged strong {
+  color: var(--amber);
+  font-weight: 600;
+}
+
 .verify-result.fail {
   border-left: 2px solid var(--amber);
   background: var(--ink-850);
@@ -1820,7 +1832,13 @@ input:focus {
   font-variant-numeric: tabular-nums;
 }
 
-/* A quiet switch that reveals the Developer Console. Off by default, so consumers never see it. */
+/* A quiet switch that reveals the Developer Console. Off by default, so consumers never see it.
+   It sits right under the console cards, so flipping it shows the Developer Console card in view. */
+.dev-toggle-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
 .dev-toggle {
   display: inline-flex;
   align-items: center;

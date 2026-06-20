@@ -73,10 +73,13 @@ export async function verify(opts: VerifyOptions): Promise<VerifyResult> {
   const bundle = JSON.parse(new TextDecoder().decode(plaintext)) as EvidenceBundle;
   const amountMatches = bundle.amount === record.amount;
 
-  // 4. Read the mandate from chain and confirm the action sits inside its limits.
-  const withinMandate = await checkWithinMandate(suiClient, record);
+  // 4. The compliance verdict. Forensic records carry it, stamped on chain at the moment the action
+  //    ran (the honest answer); fall back to a fresh mandate read for records anchored before the
+  //    forensic upgrade.
+  const withinMandate = record.withinMandate ?? (await checkWithinMandate(suiClient, record));
+  const breaches = record.breaches ?? 0;
 
-  return { hashMatches, amountMatches, withinMandate, bundle };
+  return { hashMatches, amountMatches, withinMandate, breaches, bundle };
 }
 
 /**

@@ -26,6 +26,7 @@ import {
   verify,
   createSession,
   listRecords,
+  breachLabels,
   EVIDENCE_VERSION,
   NETWORK,
   PACKAGE_ID,
@@ -233,7 +234,8 @@ async function cmdRecords() {
     return;
   }
   for (const r of records) {
-    console.log(`${r.actionType}  -> ${r.target}  ${r.amount}  ${suiscan(r.txDigest ?? "")}`);
+    const flag = r.withinMandate === false ? `  OUT OF BOUNDS [${breachLabels(r.breaches ?? 0).join(", ")}]` : "";
+    console.log(`${r.actionType}  -> ${r.target}  ${r.amount}${flag}  ${suiscan(r.txDigest ?? "")}`);
   }
 }
 
@@ -250,7 +252,8 @@ async function cmdVerify() {
   const walrus = getWalrusClient(sui);
   const session = await createSession(sui, signer);
 
-  let ok = 0;
+  let intact = 0;
+  let outOfBounds = 0;
   for (const r of records) {
     try {
       const result = await verify({
@@ -260,17 +263,23 @@ async function cmdVerify() {
         sessionKey: session,
         record: r,
       });
-      const pass = result.hashMatches && result.amountMatches && result.withinMandate;
-      if (pass) ok++;
+      // Integrity (hash + amount) and the compliance verdict are separate: an out-of-bounds action
+      // is still a real, unaltered record. Only a hash/amount mismatch is a TAMPERED failure.
+      const ok = result.hashMatches && result.amountMatches;
+      if (ok) intact++;
+      if (!result.withinMandate) outOfBounds++;
+      const verdict = result.withinMandate
+        ? "within rules"
+        : `OUT OF BOUNDS: ${breachLabels(result.breaches).join(", ")}`;
       console.log(
-        `${pass ? "ok  " : "FAIL"}  ${r.actionType} -> ${r.target} ${r.amount}` +
-          (pass ? `  "${result.bundle.rationale}"` : ""),
+        `${ok ? "ok      " : "TAMPERED"}  ${r.actionType} -> ${r.target} ${r.amount}  [${verdict}]` +
+          (ok ? `  "${result.bundle.rationale}"` : ""),
       );
     } catch (e) {
-      console.log(`FAIL  ${r.actionType} -> ${r.target} ${r.amount}  (${e instanceof Error ? e.message : e})`);
+      console.log(`FAIL      ${r.actionType} -> ${r.target} ${r.amount}  (${e instanceof Error ? e.message : e})`);
     }
   }
-  console.log(`\n${ok}/${records.length} verified.`);
+  console.log(`\n${intact}/${records.length} intact${outOfBounds ? `, ${outOfBounds} out of bounds` : ", all within rules"}.`);
 }
 
 async function main() {

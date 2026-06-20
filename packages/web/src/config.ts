@@ -4,7 +4,7 @@
 export const NETWORK = "testnet" as const;
 
 export const PACKAGE_ID =
-  "0xace239ce0defd77ce0c4e570233b37a86ac53377a38ae59749feda3ec9715667";
+  "0x4f3e25d7858a70ce4f1a437a3f91f24700407f52c68bb93775522d752841a3ee";
 
 // After a package upgrade, struct and event TYPES stay anchored to the package id that first
 // defined them. So type/event QUERIES (owned-object StructType filters, MoveEventType queries)
@@ -27,8 +27,8 @@ export const DEMO_AGENTS: DemoAgent[] = [
   {
     name: "Bill payer",
     blurb:
-      "One shared agent paying the bills of two consumers. Watch its full reasoning for each decision, and how it seals each consumer's records so they only ever see their own.",
-    mandateId: "0x80d5da99a1d51ed92fbc9cee907ce9b7c7c666b54751ec527108481984a7f32c",
+      "One shared agent paying the bills of two consumers. Watch its full reasoning for each decision, how it seals each consumer's records so they only see their own, and one action it got wrong, paid over the limit, captured and flagged out of bounds on chain.",
+    mandateId: "0xed07c664a788e3912570d4e268fb4c8e04cdebb01fb020b5a4dff1ace2654b25",
   },
 ];
 

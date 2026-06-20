@@ -14,7 +14,7 @@ import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import {
   getSuiClient, getSealClient, getWalrusClient, createMandate, anchor, verify, createSession,
-  listRecords, Reasoning, createMemory, EVIDENCE_VERSION, PACKAGE_ID, NETWORK,
+  listRecords, breachLabels, Reasoning, createMemory, EVIDENCE_VERSION, PACKAGE_ID, NETWORK,
 } from "avow-sdk";
 import { makePlan, makeReasoning, hasLLMKey, type Plan, type PlanStep, type Token } from "./brain";
 import { marketSnapshot, swap, placeLimit, deposit, withdraw, cancelAll, createManager, execWithRetry, balance, POOL_PAIRS, COIN_TYPE } from "./deepbook";
@@ -143,6 +143,7 @@ async function devMandates(owner: string) {
     mine.map(async (m) => {
       let revoked = false;
       let records = 0;
+      let flagged = 0;
       try {
         const obj = await sui.getObject({ id: m.mandateId, options: { showContent: true } });
         revoked = Boolean((obj.data?.content as { fields?: { revoked?: unknown } } | undefined)?.fields?.revoked);
@@ -150,11 +151,13 @@ async function devMandates(owner: string) {
         /* unreadable; leave as not-revoked */
       }
       try {
-        records = (await listRecords(sui, m.mandateId, 25)).length;
+        const recs = await listRecords(sui, m.mandateId, 25);
+        records = recs.length;
+        flagged = recs.filter((x) => x.withinMandate === false).length;
       } catch {
         /* event read failed; leave at 0 */
       }
-      return { ...m, revoked, records };
+      return { ...m, revoked, records, flagged };
     }),
   );
   return { admin: owner, platform: platformAddr, isPlatform: owner.toLowerCase() === platformAddr.toLowerCase(), mandates };
@@ -197,7 +200,13 @@ async function devVerify(owner: string, mandateId: string) {
   const reasoning = r.bundle.reasoning as { goal?: string; steps?: { title: string }[] } | undefined;
   return {
     record: { actionType: record.actionType, amount: record.amount, target: record.target, txDigest: record.txDigest },
-    result: { hashMatches: r.hashMatches, amountMatches: r.amountMatches, withinMandate: r.withinMandate },
+    result: {
+      hashMatches: r.hashMatches,
+      amountMatches: r.amountMatches,
+      withinMandate: r.withinMandate,
+      breaches: r.breaches,
+      breachLabels: breachLabels(r.breaches),
+    },
     goal: reasoning?.goal,
     steps: (reasoning?.steps ?? []).map((s) => s.title),
     rationale: r.bundle.rationale,

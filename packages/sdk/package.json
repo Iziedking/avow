@@ -1,6 +1,6 @@
 {
   "name": "avow-sdk",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Give an AI agent a portable, verifiable brain on Walrus: anchor its actions as private, verifiable evidence (Walrus + Seal + Sui), and give it memory it carries everywhere and recalls across sessions. The trust and memory layer any agent on Sui can plug into.",
   "license": "Apache-2.0",
   "type": "module",

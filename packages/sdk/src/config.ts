@@ -18,7 +18,7 @@ export const NETWORK: AvowNetwork = (env("AVOW_NETWORK") as AvowNetwork | undefi
 // AVOW_PACKAGE_ID env var when pointing at a different deployment.
 export const PACKAGE_ID =
   env("AVOW_PACKAGE_ID") ??
-  "0xace239ce0defd77ce0c4e570233b37a86ac53377a38ae59749feda3ec9715667";
+  "0x4f3e25d7858a70ce4f1a437a3f91f24700407f52c68bb93775522d752841a3ee";
 
 // After a package upgrade, struct and event TYPES stay anchored to the package id that first
 // defined them, so type/event queries (MoveEventType, owned-object StructType filters) must use

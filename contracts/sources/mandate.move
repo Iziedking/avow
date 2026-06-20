@@ -10,12 +10,12 @@
 /// wallet. The mandate is the source of truth for what was permitted, and the `record` module
 /// checks every action against it at the moment it is anchored.
 ///
-/// The key property: the contract refuses to anchor an action whose reported amount or
-/// target breaks the mandate. Since the verifiable record is the product, an out-of-bounds
-/// action simply cannot produce a valid on-chain proof. The mandate constrains the values the
-/// agent reports; it does not see the agent's wallet, so honest reporting is still the agent's
-/// responsibility and the dashboard reconciles each anchored amount against the transfer
-/// digests carried in the sealed evidence bundle.
+/// The key property: every action the agent anchors is recorded, and the `record` module stamps
+/// each one on chain with whether it stayed inside the mandate and which limits it broke. The
+/// verdict is computed by the contract, so an agent cannot dress a rule-breaking action up as
+/// compliant. The mandate constrains the values the agent reports; it does not see the agent's
+/// wallet, so honest reporting is still the agent's responsibility and the dashboard reconciles
+/// each anchored amount against the transfer digests carried in the sealed evidence bundle.
 ///
 /// Nothing here is yield-specific. A `target` is whatever the strategy acts on: a lending
 /// pool, a merchant, a market. The strategy detail lives inside the evidence bundle on Walrus.
@@ -24,18 +24,24 @@ module avow::mandate;
 use sui::event;
 use sui::vec_set::{Self, VecSet};
 
-// --- Error codes ---
+// --- Error codes (hard aborts: authorization and config only) ---
 const EWrongCap: u64 = 1;
-const ERevoked: u64 = 2;
-const EExpired: u64 = 3;
 const ENotAgent: u64 = 4;
-const EOverPerMoveCap: u64 = 5;
-const EOverDailyCap: u64 = 6;
-const ETargetNotAllowed: u64 = 7;
 const EWrongVersion: u64 = 8;
 const EInvalidConfig: u64 = 9;
 const EAccessAlreadySet: u64 = 10;
 const EAlreadyMigrated: u64 = 11;
+
+// --- Breach bits ---
+// A policy violation is recorded, not aborted, so the forensic log captures every action the agent
+// takes along with the exact rules it broke. 0 means the action was fully inside the mandate.
+const BREACH_REVOKED: u8 = 1;
+const BREACH_EXPIRED: u8 = 2;
+const BREACH_PER_MOVE: u8 = 4;
+const BREACH_DAILY: u8 = 8;
+const BREACH_TARGET: u8 = 16;
+
+const MAX_U64: u64 = 18446744073709551615;
 
 /// Bumped if the object layout changes in a future package upgrade. Existing objects are
 /// brought forward with `migrate`, so an upgrade never strands a mandate.
@@ -180,32 +186,40 @@ entry fun migrate(m: &mut Mandate, cap: &MandateCap) {
 
 // --- Package hooks for the record module ---
 
-/// Run every mandate check for an action and account it against the per-epoch cap. Aborts if
-/// the caller is not the agent, the mandate is expired or revoked, the amount exceeds a cap,
-/// or the target is not allowed. This is the single gate every anchored action passes through.
-public(package) fun check_and_account(
+/// Evaluate an action against the mandate and account its spend, WITHOUT aborting on a policy
+/// breach. Only authorization (the caller must be the named agent) and version still abort, so a
+/// stray or malicious caller can never write a record; every limit instead becomes a recorded bit,
+/// so the forensic log captures the action either way. Returns the breach bitmask (0 = within).
+public(package) fun evaluate_and_account(
     m: &mut Mandate,
     amount: u64,
     target: vector<u8>,
     ctx: &TxContext,
-) {
+): u8 {
     assert!(m.version == VERSION, EWrongVersion);
-    assert!(!m.revoked, ERevoked);
-    assert!(ctx.epoch() < m.expiry_epoch, EExpired);
-    assert!(ctx.sender() == m.agent, ENotAgent);
-    assert!(amount <= m.per_move_cap, EOverPerMoveCap);
+    assert!(ctx.sender() == m.agent, ENotAgent); // only the named agent may write a record
 
-    // Roll the window forward if the epoch advanced.
+    let mut breaches: u8 = 0;
+    if (m.revoked) breaches = breaches | BREACH_REVOKED;
+    if (ctx.epoch() >= m.expiry_epoch) breaches = breaches | BREACH_EXPIRED;
+    if (amount > m.per_move_cap) breaches = breaches | BREACH_PER_MOVE;
+
+    // Roll the per-epoch window forward if the epoch advanced.
     if (ctx.epoch() != m.last_epoch) {
         m.last_epoch = ctx.epoch();
         m.spent_in_epoch = 0;
     };
-    assert!(m.spent_in_epoch + amount <= m.daily_cap, EOverDailyCap);
-    m.spent_in_epoch = m.spent_in_epoch + amount;
+    // Over the daily cap? Compare without overflowing.
+    let over_daily = if (m.spent_in_epoch >= m.daily_cap) true
+        else amount > m.daily_cap - m.spent_in_epoch;
+    if (over_daily) breaches = breaches | BREACH_DAILY;
+    // Account the reported spend so the running total reflects everything the agent did (saturating,
+    // so an absurd reported amount can never overflow-abort the counter).
+    m.spent_in_epoch = if (m.spent_in_epoch > MAX_U64 - amount) MAX_U64 else m.spent_in_epoch + amount;
 
-    if (m.restrict_targets) {
-        assert!(m.allowed_targets.contains(&target), ETargetNotAllowed);
-    };
+    if (m.restrict_targets && !m.allowed_targets.contains(&target)) breaches = breaches | BREACH_TARGET;
+
+    breaches
 }
 
 /// Record the one evidence access for this mandate. Callable once; a second attempt aborts.

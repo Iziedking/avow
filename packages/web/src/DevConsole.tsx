@@ -24,6 +24,7 @@ interface MandateRow {
   agentAddress: string;
   revoked?: boolean;
   records?: number;
+  flagged?: number;
 }
 
 const HELP: [string, string][] = [
@@ -163,12 +164,12 @@ export function DevConsole() {
         const ms = await loadMandates(owner);
         if (!ms.length) return add("out", 'no mandates yet — claim an agent in the console (/?console) first.');
         add("head", `${ms.length} mandate(s) you administer`);
-        ms.forEach((m, i) =>
-          add(
-            m.revoked ? "dim" : "ok",
-            `  [${i + 1}] ${short(m.mandateId)}   agent ${short(m.agentAddress)}   ${m.revoked ? "REVOKED" : (m.records ?? 0) + " proofs"}`,
-          ),
-        );
+        ms.forEach((m, i) => {
+          const status = m.revoked
+            ? "REVOKED"
+            : `${m.records ?? 0} proofs${m.flagged ? ` · ${m.flagged} flagged` : ""}`;
+          add(m.revoked || m.flagged ? "dim" : "ok", `  [${i + 1}] ${short(m.mandateId)}   agent ${short(m.agentAddress)}   ${status}`);
+        });
         return;
       }
 
@@ -201,8 +202,10 @@ export function DevConsole() {
         add("dim", "reading from Walrus · decrypting via Seal · recomputing the hash…");
         const r = await api("/dev/verify", { owner, mandateId: m.mandateId });
         if (r.error) return add("err", r.error);
-        const ok = r.result.hashMatches && r.result.withinMandate;
-        add(ok ? "ok" : "err", `${ok ? "✓ verified" : "✗ failed"} — hash ${r.result.hashMatches ? "matches" : "MISMATCH"} · ${r.result.withinMandate ? "within mandate" : "OUTSIDE mandate"}`);
+        const intact = r.result.hashMatches && r.result.amountMatches;
+        add(intact ? "ok" : "err", `${intact ? "✓ intact" : "✗ TAMPERED"} — sealed evidence matches the hash anchored on chain`);
+        if (r.result.withinMandate) add("ok", "✓ within rules — the action stayed inside the mandate");
+        else add("err", `⚠ OUT OF BOUNDS — ${(r.result.breachLabels ?? []).join(", ")}`);
         add("out", `action: ${r.record.actionType} ${r.record.amount !== "0" ? r.record.amount : ""} on ${r.record.target}`);
         if (r.goal) add("out", `decrypted goal: ${r.goal}`);
         (r.steps ?? []).forEach((s: string) => add("dim", `  · ${s}`));

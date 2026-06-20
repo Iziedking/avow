@@ -53,12 +53,14 @@ agent, a payment agent, and a trading agent all use the same two calls.
 
 - `anchor(action)` hashes an evidence bundle, encrypts it with Seal, stores the ciphertext on
   Walrus, and records the blob id, the hash, and a few public fields on Sui through
-  `record::anchor`. That call runs the mandate check, so an action whose reported amount or
-  target breaks the mandate cannot produce a record at all.
+  `record::anchor`. That call evaluates the action against the mandate and stamps the record with
+  whether it stayed inside the limits and, if not, which it broke. Every action the agent anchors
+  is captured, in bounds or not, so the track record is complete and forensic, and the verdict is
+  computed on chain, so the agent cannot dress a rule-breaking action up as compliant.
 - `verify(record)` reads the blob back from Walrus, decrypts it with Seal for an authorized
-  reader, recomputes the SHA-256, and compares it to the on-chain anchor. Then it reads the
-  mandate from chain and confirms the action sat inside its limits. It checks the agent
-  rather than trusting it.
+  reader, recomputes the SHA-256, and compares it to the on-chain anchor. It reads the compliance
+  verdict the contract stamped at anchor time, so you see exactly which actions stayed inside the
+  limits and which broke them. It checks the agent rather than trusting it.
 
 The strategy detail (the rates seen, the prices, the route, the receipts) lives inside the
 sealed bundle on Walrus. Only the hash and a few headline fields ever touch the Move event.
@@ -361,8 +363,8 @@ export AVOW_MANDATE_ID=0x...   AVOW_ACCESS_ID=0x...
 ```
 
 **Anchor an action.** Run this as the agent (its key in `AVOW_KEY`). It seals the evidence on
-Walrus and stamps the proof on chain. An amount or target that breaks the mandate will not
-anchor at all.
+Walrus and stamps the proof on chain, marked with whether the action stayed inside the mandate. An
+out-of-bounds amount or target is recorded and flagged, not dropped.
 
 ```bash
 avow anchor --mandate $AVOW_MANDATE_ID --access $AVOW_ACCESS_ID \
@@ -379,8 +381,9 @@ avow records --mandate $AVOW_MANDATE_ID
 ```
 
 **Verify privately.** This is the point of Avow. It reads each blob back from Walrus, decrypts
-it with Seal (only if your key is an authorized reader), recomputes the hash, and confirms each
-action sat inside the mandate. It prints `ok` or `FAIL` per record and a final tally.
+it with Seal (only if your key is an authorized reader), recomputes the hash, and reads the
+on-chain verdict. It prints whether each record is intact and within the rules or flagged out of
+bounds, with a final tally (`N intact, M out of bounds`).
 
 ```bash
 avow verify --mandate $AVOW_MANDATE_ID
@@ -392,8 +395,11 @@ the dashboard use, so a record anchored from the terminal verifies in the browse
 ## What it proves, and what it does not
 
 Avow proves two things about every anchored action: the evidence has not been altered since it
-was anchored (the on-chain hash binds it), and the action was inside the declared limits (the
-anchor could not exist otherwise).
+was anchored (the on-chain hash binds it), and whether the action stayed inside the mandate, judged
+by the contract at the moment it ran and stamped on the record. Every action the agent anchors is
+captured, in bounds or not, and the verdict is computed on chain, so an agent cannot pass a
+rule-breaking action off as compliant. You get a complete, forensic track record, with each action
+marked clean or flagged out of bounds, not just the obedient half.
 
 It does not, on its own, prove that the agent reported the true amount, or that it anchored
 every action it took. The mandate holds no funds, so it cannot force either. That last mile is

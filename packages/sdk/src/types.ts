@@ -93,6 +93,31 @@ export interface AnchoredRecord {
   txDigest?: string;
   /** When the anchor was emitted, in milliseconds, when available. */
   timestampMs?: number;
+  /** True if the action stayed inside every mandate limit at anchor time, stamped on chain. */
+  withinMandate?: boolean;
+  /** Bitmask of the limits the action broke (0 = none), as recorded on chain. */
+  breaches?: number;
+}
+
+/** Mandate-breach bits, matching the Move contract (mandate.move). A forensic record carries this
+ *  so an auditor can see exactly which rules an action broke. */
+export const BREACH = {
+  REVOKED: 1,
+  EXPIRED: 2,
+  PER_MOVE: 4,
+  DAILY: 8,
+  TARGET: 16,
+} as const;
+
+/** Decode a breach bitmask into plain-language labels. Empty when the action was within bounds. */
+export function breachLabels(breaches: number): string[] {
+  const out: string[] = [];
+  if (breaches & BREACH.REVOKED) out.push("mandate revoked");
+  if (breaches & BREACH.EXPIRED) out.push("mandate expired");
+  if (breaches & BREACH.PER_MOVE) out.push("over the per-move cap");
+  if (breaches & BREACH.DAILY) out.push("over the daily cap");
+  if (breaches & BREACH.TARGET) out.push("target not allowed");
+  return out;
 }
 
 export interface VerifyResult {
@@ -100,8 +125,11 @@ export interface VerifyResult {
   hashMatches: boolean;
   /** The bundle's amount matches the anchored amount. */
   amountMatches: boolean;
-  /** The action sits inside the mandate's limits as read independently from chain. */
+  /** The action stayed inside the mandate's limits, from the on-chain verdict stamped at anchor
+   *  time (falls back to a fresh read for records anchored before the forensic upgrade). */
   withinMandate: boolean;
+  /** Bitmask of the limits the action broke (0 = none), from the on-chain record. */
+  breaches: number;
   /** The decrypted bundle. */
   bundle: EvidenceBundle;
 }

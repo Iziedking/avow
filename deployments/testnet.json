@@ -1,15 +1,19 @@
 {
   "network": "testnet",
-  "packageId": "0x635babba8ed8ff326830ac22b77d6e3a541824926292135e8d68248760a5ff6e",
-  "modules": ["mandate", "record"],
-  "upgradeCap": "0xb6930389cdcab21aedf9de624ed97c5f6094be079bb9d50a1132ca8bd66cb4a9",
+  "packageId": "0x4f3e25d7858a70ce4f1a437a3f91f24700407f52c68bb93775522d752841a3ee",
+  "modules": [
+    "mandate",
+    "record"
+  ],
+  "upgradeCap": "0x78c7cd7a690d012a5ab898370f37c5c841b2d6ab8ef46a4615528a643c0b2e7e",
   "publisher": "0xc11c77d7f5f0555041e04a89a266edbe305da731c4f10c102bc4384536bbb65b",
-  "publishTx": "CbhJguh1Woe4c9hboiBTKdTkncTBhqWXYMsPZdqaTYBH",
-  "publishedAt": "2026-06-16",
+  "publishTx": "G3mb1WwAK6X4vphAmjwjyTZYZFt4yRWo2joT4LqH1bek",
+  "publishedAt": "2026-06-20",
   "walrusSite": {
     "siteObjectId": "0xdee4e3cd312f85839433412be5b9c40e21cbb5fde01919775f23fa67d1e10961",
     "base36": "5jzsipxb40vuyq7yyit685ma0fnndw56udrcp65x6emu3smnoh",
     "note": "Testnet site, viewable only via a self-hosted portal. Public URL needs a mainnet deploy plus a SuiNS name.",
     "deployedAt": "2026-06-17"
-  }
+  },
+  "note": "Forensic log: anchor records every action, stamped within_mandate + breaches."
 }

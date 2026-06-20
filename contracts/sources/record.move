@@ -7,19 +7,21 @@
 /// any money-moving agent can plug in. For every action the agent takes, it builds an
 /// evidence bundle off chain (its rationale, the data it paid for, the before and after
 /// state, and the on-chain transaction digests), Seal-encrypts it, and stores the ciphertext
-/// on Walrus. It then calls `anchor`, which checks the action against the mandate and records
-/// the Walrus blob id, the content hash, the amount, the action type, and the target on chain
-/// as an event. Because `anchor` runs the mandate check, an action whose reported amount or
-/// target breaks the mandate cannot produce a valid record.
+/// on Walrus. It then calls `anchor`, which evaluates the action against the mandate and records
+/// the Walrus blob id, the content hash, the amount, the action type, and the target on chain as
+/// an event, stamped with whether the action stayed inside the limits and, if not, which it broke.
+/// Every action the agent anchors is captured, in bounds or not, so the record is a complete,
+/// forensic track record. The compliance verdict is computed on chain, so the agent cannot stamp a
+/// rule-breaking action as compliant.
 ///
 /// The Move event stays generic. Strategy detail (APYs, prices, routes, receipts) never goes
 /// on chain; it lives inside the sealed bundle on Walrus. `action_type` is a free label such
 /// as b"yield_move", b"payment", or b"trade", and `target` is whatever the strategy acts on.
 ///
-/// What the anchor proves: every anchored action was inside the declared limits, and the
-/// sealed bundle has not been altered since (the on-chain hash binds it). What it does not
-/// prove on its own: that the agent reported the true amount, or that it anchored every
-/// action it took. The mandate holds no funds, so those two are closed off chain by the
+/// What the anchor proves: every anchored action carries its compliance, judged on chain at the
+/// moment it ran, and the sealed bundle has not been altered since (the on-chain hash binds it).
+/// What it does not prove on its own: that the agent reported the true amount, or that it anchored
+/// every action it took. The mandate holds no funds, so those two are closed off chain by the
 /// dashboard, which decrypts the bundle, recomputes the hash, and reconciles the anchored
 /// amount against the transaction digests inside it.
 ///
@@ -87,6 +89,11 @@ public struct ActionAnchored has copy, drop {
     /// mandate.
     target: vector<u8>,
     epoch: u64,
+    /// True if the action stayed inside every mandate limit at the moment it was anchored.
+    within_mandate: bool,
+    /// Bitmask of the limits it broke, 0 when none: revoked | expired | per-move | daily | target.
+    /// Computed on chain, so the agent cannot stamp a rule-breaking action as compliant.
+    breaches: u8,
 }
 
 public struct AuditorAdded has copy, drop { access_id: ID, auditor: address }
@@ -141,8 +148,10 @@ entry fun migrate_access(access: &mut EvidenceAccess, cap: &MandateCap) {
 
 // --- Anchor an action ---
 
-/// Check the action against the mandate, then record its evidence anchor on chain.
-/// Callable only by the mandate's agent; the agent check lives in `check_and_account`.
+/// Evaluate the action against the mandate, then record its evidence anchor on chain, stamped with
+/// whether it stayed inside the limits. Callable only by the mandate's agent (the authorization
+/// check lives in `evaluate_and_account` and still aborts); a policy breach is recorded, not
+/// rejected, so the track record captures everything the agent did, in bounds or not.
 public fun anchor(
     m: &mut Mandate,
     access: &EvidenceAccess,
@@ -162,8 +171,9 @@ public fun anchor(
     assert!(!blob_id.is_empty(), EBadEvidence);
     assert!(evidence_hash.length() == HASH_LEN, EBadEvidence);
 
-    // Enforce every mandate limit and account the action. Aborts if out of bounds.
-    mandate::check_and_account(m, amount, target, ctx);
+    // Evaluate against every mandate limit and account the spend. Aborts only if the caller is not
+    // the agent; any limit it breaks comes back as a bitmask instead of aborting.
+    let breaches = mandate::evaluate_and_account(m, amount, target, ctx);
 
     event::emit(ActionAnchored {
         mandate_id: mandate::id(m),
@@ -176,6 +186,8 @@ public fun anchor(
         action_type,
         target,
         epoch: ctx.epoch(),
+        within_mandate: breaches == 0,
+        breaches,
     });
 }
 

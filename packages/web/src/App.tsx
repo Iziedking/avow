@@ -6,13 +6,13 @@ import {
 } from "@mysten/dapp-kit";
 import { WalletConnect } from "./WalletConnect";
 import { Docs } from "./Docs";
-import { isDevMode, setDevMode } from "./devmode";
 import { Transaction } from "@mysten/sui/transactions";
 import {
   fetchRecords,
   fetchAccessId,
   fetchMandate,
   fetchMyMandates,
+  breachLabels,
   type AnchoredRecord,
   type MandateInfo,
 } from "./records";
@@ -157,15 +157,6 @@ export function App() {
     }
   }, [mode]);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [devMode, setDevModeState] = useState(isDevMode);
-  const toggleDevMode = () => {
-    const next = !devMode;
-    setDevModeState(next);
-    setDevMode(next);
-    // Turning it on takes you straight into the Developer Console (the toggle lives at the page
-    // bottom, so just revealing a card up top reads as "nothing happened"). Turning it off stays.
-    if (next) window.location.href = "/?dev";
-  };
   const [soundMuted, setSoundMuted] = useState(() => {
     try {
       return localStorage.getItem("avow-muted") === "1";
@@ -602,8 +593,9 @@ export function App() {
           <div>
             <h3>The agent acts, and proves it</h3>
             <p>
-              Each time it acts, it saves what it did and why, and locks in a proof. An action
-              that breaks your rules can't make a proof, so it can't hide it.
+              Each time it acts, it seals what it did and why as a proof. Anchoring runs your rules
+              first, so a proof can only exist for an action that stayed inside your limits, and the
+              sealed evidence can't be altered after.
             </p>
           </div>
         </div>
@@ -1013,8 +1005,12 @@ export function App() {
                 </div>
 
                 {v.status === "ok" && (
-                  <div className="verify-result ok">
-                    <strong>Verified. This action obeyed your rules.</strong>
+                  <div className={`verify-result ${r.withinMandate === false ? "flagged" : "ok"}`}>
+                    <strong>
+                      {r.withinMandate === false
+                        ? "Verified, and flagged out of bounds."
+                        : "Verified, and within your rules."}
+                    </strong>
                     <div className="reveal-block">
                       <span className="reveal-k">unaltered</span>
                       <p className="reveal-why">
@@ -1022,19 +1018,16 @@ export function App() {
                         changed after the fact.
                       </p>
                     </div>
-                    {mandate && (
-                      <div className="reveal-block">
-                        <span className="reveal-k">within the limit</span>
-                        <p className="reveal-why">
-                          it moved {money(r.amount, r.actionType, dev)}; the limit is{" "}
-                          {money(mandate.perMoveCap.toString(), r.actionType, dev)} per action.{" "}
-                          {BigInt(r.amount || "0") <= BigInt(mandate.perMoveCap)
-                            ? "Inside the limit ✓"
-                            : "over the limit"}
-                          . An over-limit action could not have produced this proof at all.
-                        </p>
-                      </div>
-                    )}
+                    <div className="reveal-block">
+                      <span className="reveal-k">
+                        {r.withinMandate === false ? "out of bounds" : "within the rules"}
+                      </span>
+                      <p className="reveal-why">
+                        {r.withinMandate === false
+                          ? `the contract judged this action against your mandate the moment it ran and flagged it: ${breachLabels(r.breaches ?? 0).join(", ")}. It moved ${money(r.amount, r.actionType, dev)}. The verdict is computed on chain, so the agent cannot fake it.`
+                          : `the contract judged this action against your mandate the moment it ran, and it stayed inside every limit. It moved ${money(r.amount, r.actionType, dev)}.`}
+                      </p>
+                    </div>
                     {describeObserved(v.observed).length > 0 && (
                       <div className="reveal-block">
                         <span className="reveal-k">what it saw</span>
@@ -1101,17 +1094,20 @@ export function App() {
         chain, or the record does not verify.
       </p>
 
+      {/* In developer mode the card is the Developer Console; otherwise it's the consumer Testnet
+          Console. One switch (Settings -> Developer mode) drives both this and the dashboard. */}
       <div className="console-ctas reveal">
-        <a className="console-cta" href="/?console">
-          <span className="cc-prompt">&gt;_</span>
-          <span className="cc-text">Testnet Console</span>
-          <span className="cc-sub">claim a live DeepBook agent ·  instruct it in plain English</span>
-        </a>
-        {devMode && (
+        {mode === "build" ? (
           <a className="console-cta" href="/?dev">
             <span className="cc-prompt">&gt;_</span>
             <span className="cc-text">Developer Console</span>
             <span className="cc-sub">grant auditors ·  revoke ·  verify proofs ·  call the SDK</span>
+          </a>
+        ) : (
+          <a className="console-cta" href="/?console">
+            <span className="cc-prompt">&gt;_</span>
+            <span className="cc-text">Testnet Console</span>
+            <span className="cc-sub">claim a live DeepBook agent ·  instruct it in plain English</span>
           </a>
         )}
       </div>
@@ -1142,13 +1138,6 @@ export function App() {
         </div>
         <div className="foot-base">
           <span>Apache-2.0</span>
-          <button
-            className={`dev-toggle${devMode ? " is-on" : ""}`}
-            onClick={toggleDevMode}
-            title="Reveal the Developer Console (grant, revoke, verify, SDK)"
-          >
-            <span className="dt-dot" /> developer mode <span className="dt-state">{devMode ? "on" : "off"}</span>
-          </button>
           <span className="foot-meta">testnet · {short(PACKAGE_ID)}</span>
         </div>
       </footer>

@@ -222,8 +222,9 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
           <h3>anchor(action)</h3>
           <p>
             Hashes the evidence, the action and its reasoning, sealed to the user it served,
-            encrypts it with Seal, stores it on Walrus, and records the anchor on Sui through the
-            mandate check. An action that breaks the mandate cannot anchor at all.
+            encrypts it with Seal, stores it on Walrus, and records the anchor on Sui, stamped with
+            whether it stayed inside the mandate. Every action is captured, in bounds or not, and an
+            out-of-bounds one is flagged on chain, not dropped.
           </p>
         </div>
         <div className="doc-card">
@@ -698,7 +699,10 @@ export AVOW_MANDATE_ID=0x...  AVOW_ACCESS_ID=0x...`}
       <CodeBlock caption="grant" code={`avow grant --mandate $AVOW_MANDATE_ID --auditor 0xAUDITOR`} />
 
       <h3>Log an action, and prove it</h3>
-      <p>Run as the agent. A move that breaks the mandate will not anchor at all.</p>
+      <p>
+        Run as the agent. The anchor stamps each record with whether it stayed inside the mandate;
+        a move that breaks it is recorded and flagged out of bounds, not dropped.
+      </p>
       <CodeBlock
         caption="anchor"
         code={`avow anchor --mandate $AVOW_MANDATE_ID --access $AVOW_ACCESS_ID \\

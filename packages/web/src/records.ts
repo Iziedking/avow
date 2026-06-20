@@ -23,6 +23,21 @@ export interface AnchoredRecord {
   epoch: string;
   txDigest: string;
   timestampMs: number;
+  /** True if the action stayed inside every mandate limit at anchor time (on-chain verdict). */
+  withinMandate?: boolean;
+  /** Bitmask of limits broken, 0 = none: revoked|expired|per-move|daily|target. */
+  breaches?: number;
+}
+
+/** Decode the on-chain breach bitmask into plain labels (matches the Move contract). */
+export function breachLabels(breaches: number): string[] {
+  const out: string[] = [];
+  if (breaches & 1) out.push("mandate revoked");
+  if (breaches & 2) out.push("mandate expired");
+  if (breaches & 4) out.push("over the per-move cap");
+  if (breaches & 8) out.push("over the daily cap");
+  if (breaches & 16) out.push("target not allowed");
+  return out;
 }
 
 export function suiClient(): SuiJsonRpcClient {
@@ -56,6 +71,8 @@ function parseAnchored(e: { parsedJson: unknown; id: { txDigest: string }; times
     epoch: String(j.epoch),
     txDigest: e.id.txDigest,
     timestampMs: Number(e.timestampMs ?? 0),
+    withinMandate: j.within_mandate === undefined ? undefined : Boolean(j.within_mandate),
+    breaches: j.breaches === undefined ? undefined : Number(j.breaches),
   };
 }
 

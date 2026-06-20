@@ -216,6 +216,62 @@ async function devVerify(owner: string, mandateId: string) {
   };
 }
 
+// The full developer flow, run live and for real: mint a mandate, seal an action's reasoning on
+// Walrus and anchor it on Sui, then read it back and verify it. This is exactly what the `avow` CLI
+// does (create-mandate, anchor, records, verify), signed by the platform key so the console can play
+// the whole thing with one command. Returns each step's real result for the console to print.
+async function devDemo() {
+  const PER_MOVE = 5000n;
+  const AMOUNT = "1500";
+
+  // 1. create-mandate: the platform is the agent so it can anchor in this self-contained demo.
+  const m = await createMandate(sui, platform, {
+    agent: platformAddr,
+    perMoveCap: PER_MOVE,
+    dailyCap: 100_000n,
+    expiryEpoch: 100000n,
+  });
+
+  // 2. anchor: capture the reasoning, seal it, stamp it on chain.
+  const reasoning = new Reasoning("Pay the invoice the user approved")
+    .observe("Read the invoice", "Stripe invoice inv_42 for 1500")
+    .decide("Approved and paid", "the user pre-approved this invoice")
+    .build("Paid Stripe 1500");
+  const proof = await anchor({
+    suiClient: sui, sealClient: seal, walrusClient: walrus, signer: platform,
+    mandateId: m.mandateId, accessId: m.accessId,
+    bundle: {
+      version: EVIDENCE_VERSION, mandateId: m.mandateId, agent: platformAddr, user: platformAddr,
+      reasoning, actionType: "payment", target: "stripe", amount: AMOUNT,
+      rationale: "Paid the invoice the user approved.",
+      observed: { invoiceId: "inv_42" }, before: {}, after: {}, txDigests: [], timestampMs: Date.now(),
+    },
+  });
+
+  // 3. records + 4. verify: read it back and check it the way an auditor would.
+  const records = await listRecords(sui, m.mandateId, 5);
+  const session = await createSession(sui, platform);
+  const v = await verify({ suiClient: sui, sealClient: seal, walrusClient: walrus, sessionKey: session, record: records[0] });
+
+  return {
+    agent: platformAddr,
+    mandateId: m.mandateId,
+    accessId: m.accessId,
+    perMove: Number(PER_MOVE),
+    amount: AMOUNT,
+    blobId: proof.blobId,
+    anchorDigest: proof.anchorDigest,
+    recordCount: records.length,
+    verify: {
+      hashMatches: v.hashMatches,
+      amountMatches: v.amountMatches,
+      withinMandate: v.withinMandate,
+      breachLabels: breachLabels(v.breaches),
+    },
+    rationale: v.bundle.rationale,
+  };
+}
+
 // Fund a fresh agent with gas SUI + WAL (storage) + DEEP (DeepBook taker fees) in one atomic tx,
 // so trading never depends on the live DEEP_SUI pool (which goes dry on testnet). 0.15 DEEP covers
 // several swaps; the platform keeps a DEEP reserve and tops it up when the pools are liquid.
@@ -561,6 +617,9 @@ const server = createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/dev/recall") {
       const { owner, query } = await json(req);
       return send(200, { results: await memory.recall(String(owner), String(query), 6) });
+    }
+    if (req.method === "POST" && req.url === "/dev/demo") {
+      return send(200, await devDemo());
     }
     return res.writeHead(404).end();
   } catch (e) {

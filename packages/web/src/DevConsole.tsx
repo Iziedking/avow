@@ -12,8 +12,10 @@ import { WalletConnect } from "./WalletConnect";
 const AGENT_API =
   (import.meta.env.VITE_AGENT_API as string | undefined)?.replace(/\/$/, "") ?? "http://localhost:8787";
 const short = (a: string) => `${a.slice(0, 6)}…${a.slice(-4)}`;
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const sc = (digest: string) => `https://suiscan.xyz/testnet/tx/${digest}`;
 
-type Kind = "out" | "ok" | "err" | "code" | "head" | "dim";
+type Kind = "out" | "ok" | "err" | "code" | "head" | "dim" | "step";
 interface Line {
   kind: Kind | "cmd";
   text: string;
@@ -28,9 +30,10 @@ interface MandateRow {
 }
 
 const HELP: [string, string][] = [
+  ["demo", "run the full CLI flow live: create, anchor, records, verify"],
   ["mandates", "list the mandates you own (numbered)"],
   ["grant <0xauditor> [#]", "give a wallet read access to mandate #"],
-  ["revoke <#>", "revoke a mandate — the agent can no longer act"],
+  ["revoke <#>", "revoke a mandate, the agent can no longer act"],
   ["verify [#]", "verify the latest proof for mandate # (Walrus + Seal)"],
   ["remember <text>", "store a memory on Walrus"],
   ["recall <query>", "recall from memory, by meaning"],
@@ -158,6 +161,41 @@ export function DevConsole() {
     switch (c) {
       case "whoami":
         return add("out", `acting as ${owner}`);
+
+      case "demo": {
+        // The whole developer flow, live and real, in one command. Mirrors the avow CLI.
+        add("head", "the full developer flow, live and for real");
+        add("dim", "create a mandate, seal an action on Walrus, anchor it on Sui, then verify it");
+        add("dim", "running… real transactions plus Walrus and Seal, give it a moment");
+        const r = await api("/dev/demo", { owner });
+        if (r.error) return add("err", r.error);
+        await sleep(150);
+        add("step", `$ avow create-mandate --agent ${short(r.agent)} --per-move ${r.perMove} --daily 100000`);
+        await sleep(200);
+        add("ok", `mandate ${short(r.mandateId)}   ·   access ${short(r.accessId)}`);
+        await sleep(350);
+        add("step", `$ avow anchor --mandate ${short(r.mandateId)} --action payment --target stripe --amount ${r.amount} --rationale "paid the approved invoice"`);
+        await sleep(200);
+        add("ok", `sealed on Walrus (blob ${short(r.blobId)})  ·  anchored on Sui`);
+        await sleep(150);
+        add("out", `proof tx ${short(r.anchorDigest)} ↗`, sc(r.anchorDigest));
+        await sleep(350);
+        add("step", `$ avow records --mandate ${short(r.mandateId)}`);
+        await sleep(200);
+        add("out", `payment  ->  stripe  ${r.amount}`);
+        await sleep(350);
+        add("step", `$ avow verify --mandate ${short(r.mandateId)}`);
+        await sleep(200);
+        const within = r.verify?.withinMandate;
+        const intact = r.verify?.hashMatches && r.verify?.amountMatches;
+        add(
+          intact && within ? "ok" : "err",
+          `${intact ? "✓ intact" : "✗ tampered"}  ·  ${within ? "within rules" : "OUT OF BOUNDS: " + (r.verify?.breachLabels ?? []).join(", ")}   "${r.rationale}"`,
+        );
+        await sleep(200);
+        add("dim", "that is the whole flow: an action sealed, anchored, and verified on chain. two SDK calls.");
+        return;
+      }
 
       case "mandates":
       case "ls": {

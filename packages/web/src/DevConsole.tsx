@@ -163,8 +163,8 @@ export function DevConsole() {
         return add("out", `acting as ${owner}`);
 
       case "demo": {
-        // The whole developer flow, live and real, in one command. Mirrors the avow CLI.
-        add("head", "the full developer flow, live and for real");
+        // The whole developer flow, live, in one command. Mirrors the avow CLI.
+        add("head", "the full developer flow, live");
         add("dim", "create a mandate, seal an action on Walrus, anchor it on Sui, then verify it");
         add("dim", "running… real transactions plus Walrus and Seal, give it a moment");
         const r = await api("/dev/demo", { owner });

@@ -144,6 +144,25 @@ async function ownerMandates(owner: string): Promise<{ mandateId: string; agentA
   return out;
 }
 
+// The public RPC lags a tx or two behind, so back-to-back signs on one gas coin race
+// ("unavailable for consumption" / "needs to be rebuilt"). Retry the call with backoff. Used to
+// wrap SDK functions (createMandate, anchor) that sign internally and so can't use execWithRetry.
+async function withRetry<T>(fn: () => Promise<T>, tries = 6): Promise<T> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const msg = (e as Error).message;
+      if (i < tries - 1 && /unavailable for consumption|needs to be rebuilt|reserved|equivocat|not available|conflicting/i.test(msg)) {
+        await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
+        continue;
+      }
+      throw e;
+    }
+  }
+  throw new Error("retries exhausted");
+}
+
 async function capIdForAgent(agentAddr: string, mandateId: string): Promise<string> {
   const res = await sui.getOwnedObjects({ owner: agentAddr, filter: { StructType: `${PACKAGE_ID}::mandate::MandateCap` }, options: { showContent: true } });
   for (const o of res.data) {
@@ -261,19 +280,19 @@ async function devDemo() {
   const AMOUNT = "1500";
 
   // 1. create-mandate: the platform is the agent so it can anchor in this self-contained demo.
-  const m = await createMandate(sui, platform, {
+  const m = await withRetry(() => createMandate(sui, platform, {
     agent: platformAddr,
     perMoveCap: PER_MOVE,
     dailyCap: 100_000n,
     expiryEpoch: 100000n,
-  });
+  }));
 
   // 2. anchor: capture the reasoning, seal it, stamp it on chain.
   const reasoning = new Reasoning("Pay the invoice the user approved")
     .observe("Read the invoice", "Stripe invoice inv_42 for 1500")
     .decide("Approved and paid", "the user pre-approved this invoice")
     .build("Paid Stripe 1500");
-  const proof = await anchor({
+  const proof = await withRetry(() => anchor({
     suiClient: sui, sealClient: seal, walrusClient: walrus, signer: platform,
     mandateId: m.mandateId, accessId: m.accessId,
     bundle: {
@@ -282,7 +301,7 @@ async function devDemo() {
       rationale: "Paid the invoice the user approved.",
       observed: { invoiceId: "inv_42" }, before: {}, after: {}, txDigests: [], timestampMs: Date.now(),
     },
-  });
+  }));
 
   // 3. records + 4. verify: read it back and check it the way an auditor would.
   const records = await listRecords(sui, m.mandateId, 5);

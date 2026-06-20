@@ -13,6 +13,7 @@ on:
       - "packages/sdk/**"
       - "Dockerfile"
       - ".dockerignore"
+      - "deploy/**"
       - ".github/workflows/deploy-agent.yml"
   workflow_dispatch:
 
@@ -54,6 +55,20 @@ jobs:
           tags: ${{ steps.img.outputs.name }}:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # Ship the current compose file to the VPS so a change in the repo deploys itself. Only the
+      # compose file is avow-owned and safe to overwrite; the Caddyfile is a shared file on this
+      # VPS (the existing Caddy serves other sites too), so the avow site block is added once by hand.
+      - name: Ship the compose file to the VPS
+        if: env.VPS_HOST != ''
+        uses: appleboy/scp-action@v1
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          source: deploy/docker-compose.yml
+          target: ~/avow-deploy/
+          strip_components: 1 # drop the deploy/ prefix so it lands as ~/avow-deploy/docker-compose.yml
 
       # Skips until the VPS secrets exist, so the image still builds and pushes in the meantime.
       - name: Roll out on the VPS

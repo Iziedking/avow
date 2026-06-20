@@ -27,18 +27,20 @@ api.avow.site    -> VPS    -> Caddy (TLS) -> agent container :8787
 If you only do this step, judges still get the landing page, the docs, and the full verify
 dashboard. The live agent typing needs the backend below.
 
-## Backend (VPS, Docker, Caddy)
+## Backend (VPS, Docker)
+
+This VPS already runs a Caddy (it serves other sites too), so Avow does NOT run its own Caddy. The
+agent joins the existing Caddy's Docker network (`deploy_default`) and the existing Caddy proxies
+`api.avow.site` to it. One Caddy on the box, never two fighting for ports 80/443.
 
 One-time setup on the VPS (Docker and the compose plugin installed):
 
 ```bash
 mkdir -p ~/avow-deploy && cd ~/avow-deploy
-# copy deploy/docker-compose.yml and deploy/Caddyfile here
-cp /path/to/repo/deploy/docker-compose.yml .
-cp /path/to/repo/deploy/Caddyfile .
-cp /path/to/repo/deploy/.env.example .env   # then fill in the real secrets
+cp /path/to/repo/deploy/docker-compose.yml .         # the shared-Caddy compose (no Caddy service)
+cp /path/to/repo/deploy/.env.example .env            # then fill in the real secrets
 
-# log in once so the box can pull the private image (use a GitHub PAT with read:packages)
+# log in once so the box can pull the private image (a GitHub PAT with read:packages)
 echo "$GHCR_PAT" | docker login ghcr.io -u iziedking --password-stdin
 
 docker compose up -d
@@ -47,7 +49,20 @@ docker compose up -d
 Fill `~/avow-deploy/.env` from `deploy/.env.example`: `AVOW_KEY`, `ANTHROPIC_API_KEY`,
 `MEMWAL_PRIVATE_KEY`, `MEMWAL_ACCOUNT_ID`, and `AVOW_CORS_ORIGIN=https://avow.site`.
 
-Caddy provisions TLS for `api.avow.site` on first request. Check it: `curl https://api.avow.site/health`.
+Then add ONE site block to the existing Caddy's config and reload it (do this once):
+
+```bash
+printf '\napi.avow.site {\n\treverse_proxy avow-agent:8787\n}\n' >> /opt/arcrun/deploy/Caddyfile
+docker exec arcrun-caddy caddy reload --config /etc/caddy/Caddyfile
+```
+
+The existing Caddy provisions TLS for `api.avow.site` automatically. Check it:
+`curl https://api.avow.site/health`. The agent container must be on the same network as that Caddy;
+`docker-compose.yml` already sets `networks.proxy.name: deploy_default` for that.
+
+Find the Caddy's network and config path on a different box with:
+`docker inspect <caddy-container> -f '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}'`
+and `docker inspect <caddy-container> -f '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'`.
 
 ## CI/CD (GitHub Actions)
 
@@ -58,9 +73,11 @@ VPS on every push to `main` that touches the backend. Add these repo secrets:
 - `VPS_USER` — the SSH user
 - `VPS_SSH_KEY` — a private key the VPS authorizes (its public half in `~/.ssh/authorized_keys`)
 
-The workflow runs `docker compose pull && docker compose up -d` in `~/avow-deploy`, so keep the
-compose file, Caddyfile, and `.env` there. The frontend needs no workflow; Vercel's git integration
-redeploys on push.
+On each push that touches the backend or `deploy/`, the workflow ships the current
+`deploy/docker-compose.yml` to `~/avow-deploy/` (scp) and then runs `docker compose pull && up -d`,
+so a compose change deploys itself. The `.env` and the Caddy site block stay on the VPS and are not
+managed by CI (the `.env` holds secrets; the Caddyfile is shared with the box's other sites). The
+frontend needs no workflow; Vercel's git integration redeploys on push.
 
 ## A word on the platform key
 

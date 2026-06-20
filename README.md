@@ -6,15 +6,19 @@
 
 **Proof, not trust.**
 
-AI agents are starting to move real money, paying bills, rebalancing savings, settling invoices.
-Every one of them asks for the same thing: trust. Trust that it paid the right merchant, trust
-that it stayed inside your limit, trust that the thinking behind the decision was sound. You get
-an outcome and a shrug.
+Avow is the verifiable trust and memory layer for AI agents on Sui. Any agent, a trader, an
+assistant, a research bot, a bill payer, plugs in and gains two things: a memory it carries
+everywhere, and proof of everything it did and why. Agents are starting to act on our behalf, and
+every one of them asks for the same thing: trust. Trust that it did what it said, trust that it
+stayed inside the rules, trust that the thinking behind the decision was sound. You get an outcome
+and a shrug.
 
 Avow replaces the shrug with proof. Build your agent with the Avow SDK and every action it
 takes, **and the full reasoning behind it**, is sealed with Seal, stored on Walrus, and anchored
 on Sui. Anyone you authorize can later replay exactly what the agent did, *why* it did it, and
-confirm it never broke the rules you set. The strategy stays private; the proof is public.
+confirm it never broke the rules you set. The strategy stays private; the proof is public. Moving
+money is the sharpest case, where a wrong step costs you, so that is what the demo shows, but the
+layer is agent-agnostic.
 
 And when one agent serves many people, each person sees only their own. Per-user encryption,
 enforced on chain, means your agent's reasoning for you is yours alone, not a promise, a key

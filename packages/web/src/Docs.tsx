@@ -241,16 +241,17 @@ function Overview({ onJump }: { onJump: (s: Section) => void }) {
     <article className="doc-article">
       <h2>What Avow is</h2>
       <p className="doc-lead">
-        Build agents with the Avow SDK so their actions are stored on Walrus, encrypted with Seal,
-        and become verifiable and provable on Sui.
+        The verifiable trust and memory layer for AI agents on Sui. Build any agent with the Avow
+        SDK and it carries a portable memory on Walrus and proves every action it takes, sealed with
+        Seal, anchored on Sui.
       </p>
       <p>
-        Money-moving AI agents ask you to trust their numbers and their judgment. Avow makes them
-        prove both. After an agent acts, it seals the evidence, the action <em>and the full
-        reasoning behind it</em>, and stamps a tamper-proof anchor on chain. Anyone the agent
-        served, or an auditor the owner authorizes, can later decrypt it, recompute its
-        fingerprint, and confirm the action was real, inside the rules, and exactly as reasoned.
-        Two calls carry the whole product.
+        AI agents ask you to trust their numbers and their judgment. Avow makes them prove both.
+        After an agent acts, it seals the evidence, the action <em>and the full reasoning behind
+        it</em>, and stamps a tamper-proof anchor on chain. Anyone the agent served, or an auditor
+        the owner authorizes, can later decrypt it, recompute its fingerprint, and confirm the
+        action was real, inside the rules, and exactly as reasoned. Any agent qualifies; moving
+        money is just the sharpest case, where being wrong costs you.
       </p>
 
       <h3>Why this matters</h3>

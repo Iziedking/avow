@@ -566,7 +566,7 @@ export function App() {
         <p className="lede">
           {mode === "verify" ? (
             <>
-              The AI agent you use moves your money and asks you to trust it. Don't,{" "}
+              Your AI agent acts on your behalf and asks you to trust it. Don't,{" "}
               <strong>verify it</strong>. Plug it in below and see exactly what it did, why, and
               that it stayed within your limits. Proven, not promised.
             </>

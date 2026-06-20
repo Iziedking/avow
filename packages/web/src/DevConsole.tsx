@@ -76,6 +76,7 @@ export function DevConsole() {
   const logRef = useRef<HTMLDivElement>(null);
   const processingRef = useRef(false);
   const mandatesRef = useRef<MandateRow[]>([]);
+  const lastMandateRef = useRef<string | null>(null); // the mandate `demo` just made, so grant/verify default to it
 
   const add = (kind: Line["kind"], text: string, href?: string) => {
     setLines((ls) => [...ls, { kind, text, href }]);
@@ -169,6 +170,7 @@ export function DevConsole() {
         add("dim", "running… real transactions plus Walrus and Seal, give it a moment");
         const r = await api("/dev/demo", { owner });
         if (r.error) return add("err", r.error);
+        lastMandateRef.current = r.mandateId; // grant/verify with no number now target this mandate
         await sleep(150);
         add("step", `$ avow create-mandate --agent ${short(r.agent)} --per-move ${r.perMove} --daily 100000`);
         await sleep(200);
@@ -194,6 +196,12 @@ export function DevConsole() {
         );
         await sleep(200);
         add("dim", "that is the whole flow: an action sealed, anchored, and verified on chain. two SDK calls.");
+        await sleep(250);
+        add("head", "verify it yourself on the Avow home");
+        add("out", `mandate ${r.mandateId}`);
+        add("out", "open it on the home and verify ↗", `/?mandate=${r.mandateId}`);
+        await sleep(200);
+        add("dim", "or grant an auditor: type  grant 0xTHEIR_WALLET  then they verify it with their own wallet.");
         return;
       }
 

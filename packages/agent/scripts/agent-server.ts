@@ -496,12 +496,21 @@ async function json(req: IncomingMessage) {
   return JSON.parse((await readBody(req)) || "{}");
 }
 
-// Lock this to your site in production, e.g. AVOW_CORS_ORIGIN=https://avow.site. Defaults to open
-// so local development just works.
-const CORS_ORIGIN = process.env.AVOW_CORS_ORIGIN ?? "*";
+// Allowed browser origins, comma-separated, e.g.
+// AVOW_CORS_ORIGIN=https://avow.site,https://www.avow.site. The matching request origin is echoed
+// back, so apex and www both work. Defaults to "*" (open) so local development just works.
+const CORS_ORIGINS = (process.env.AVOW_CORS_ORIGIN ?? "*").split(",").map((s) => s.trim()).filter(Boolean);
+
+function corsOrigin(req: IncomingMessage): string {
+  if (CORS_ORIGINS.includes("*")) return "*";
+  const origin = req.headers.origin;
+  if (origin && CORS_ORIGINS.includes(origin)) return origin;
+  return CORS_ORIGINS[0] ?? "*";
+}
 
 const server = createServer(async (req, res) => {
-  res.setHeader("access-control-allow-origin", CORS_ORIGIN);
+  res.setHeader("access-control-allow-origin", corsOrigin(req));
+  res.setHeader("vary", "origin"); // the allow-origin varies per request, so caches must not share it
   res.setHeader("access-control-allow-headers", "content-type");
   res.setHeader("access-control-allow-methods", "POST, OPTIONS");
   const send = (code: number, body: unknown) => res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(body));

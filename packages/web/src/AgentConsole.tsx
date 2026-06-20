@@ -174,7 +174,7 @@ export function AgentConsole() {
       <div className="ac-screen hud">
         <div className="ac-bar">
           <div className="ac-bar-left">
-            <a className="ac-home" href="/">‹ home</a>
+            <a className="ac-home" href="/?app">‹ home</a>
             <span>AVOW · DEEPBOOK AGENT</span>
           </div>
           <div className="ac-bar-right">

@@ -207,7 +207,7 @@ export function DevConsole() {
         await sleep(250);
         add("head", "verify it yourself on the Avow home");
         add("out", `mandate ${r.mandateId}`);
-        add("out", "open it on the home and verify ↗", `/?mandate=${r.mandateId}`);
+        add("out", "open it on the home and verify ↗", `/?app&mandate=${r.mandateId}`);
         await sleep(200);
         add("dim", "or grant an auditor: type  grant 0xTHEIR_WALLET  then they verify it with their own wallet.");
         return;
@@ -295,7 +295,7 @@ export function DevConsole() {
       <div className="ac-screen hud">
         <div className="ac-bar">
           <div className="ac-bar-left">
-            <a className="ac-home" href="/">‹ home</a>
+            <a className="ac-home" href="/?app">‹ home</a>
             <span>AVOW · DEVELOPER CONSOLE</span>
           </div>
           <div className="ac-bar-right">

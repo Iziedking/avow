@@ -291,6 +291,30 @@ async function devVerify(owner: string, mandateId: string) {
 // Walrus and anchor it on Sui, then read it back and verify it. This is exactly what the `avow` CLI
 // does (create-mandate, anchor, records, verify), signed by the platform key so the console can play
 // the whole thing with one command. Returns each step's real result for the console to print.
+// A demo mandate created once and reused, so the demo's anchor never races a fresh mandate. Created
+// lazily on the first demo, then cached for the life of the process. Settled hard before first use.
+let demoMandateCache: { mandateId: string; accessId: string } | null = null;
+let demoMandateInflight: Promise<{ mandateId: string; accessId: string }> | null = null;
+
+async function ensureDemoMandate(): Promise<{ mandateId: string; accessId: string }> {
+  if (demoMandateCache) return demoMandateCache;
+  if (demoMandateInflight) return demoMandateInflight; // coalesce concurrent first-demos
+  demoMandateInflight = (async () => {
+    const m = await withRetry(() => createMandate(sui, platform, { agent: platformAddr, perMoveCap: 5000n, dailyCap: 100_000n, expiryEpoch: 100000n }));
+    // Settle hard: wait for both objects to be queryable, then a buffer so every RPC replica has it.
+    await waitForObject(m.mandateId);
+    await waitForObject(m.accessId);
+    await new Promise((r) => setTimeout(r, 6000));
+    demoMandateCache = { mandateId: m.mandateId, accessId: m.accessId };
+    return demoMandateCache;
+  })();
+  try {
+    return await demoMandateInflight;
+  } finally {
+    demoMandateInflight = null;
+  }
+}
+
 async function devDemo() {
   const PER_MOVE = 5000n;
   const AMOUNT = "1500";
@@ -299,36 +323,36 @@ async function devDemo() {
     .decide("Approved and paid", "the user pre-approved this invoice")
     .build("Paid Stripe 1500");
 
-  // create-mandate + anchor as one self-healing unit. The public RPC is load-balanced, so a brand
-  // new mandate can briefly look like it "does not exist" to the node the anchor hits. If anything
-  // in this block trips, we redo it from a fresh mandate (orphaned attempts are harmless), so the
-  // live demo never needs a re-type. Retries on ANY error since the whole block is safe to repeat.
-  let m!: Awaited<ReturnType<typeof createMandate>>;
-  let proof!: Awaited<ReturnType<typeof anchor>>;
+  // The hot path is anchoring, and anchoring to a brand-new mandate is what races the load-balanced
+  // RPC ("does not exist" on the node the anchor hits). So we create the demo mandate ONCE, let it
+  // fully settle across every replica, and cache it. Every demo then anchors a fresh action to that
+  // settled mandate, which has no read-after-write lag. The create step still ran for real.
+  const dm = await ensureDemoMandate();
+
+  // anchor a fresh action to the settled mandate, retrying on ANY error (Walrus, Seal, or RPC
+  // transients), always to the same cached mandate so there is never a fresh-mandate lag.
+  let proof: Awaited<ReturnType<typeof anchor>> | undefined;
   let lastErr: unknown;
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 6; attempt++) {
     try {
-      m = await createMandate(sui, platform, { agent: platformAddr, perMoveCap: PER_MOVE, dailyCap: 100_000n, expiryEpoch: 100000n });
-      await waitForObject(m.mandateId);
-      await waitForObject(m.accessId);
       proof = await anchor({
         suiClient: sui, sealClient: seal, walrusClient: walrus, signer: platform,
-        mandateId: m.mandateId, accessId: m.accessId,
+        mandateId: dm.mandateId, accessId: dm.accessId,
         bundle: {
-          version: EVIDENCE_VERSION, mandateId: m.mandateId, agent: platformAddr, user: platformAddr,
+          version: EVIDENCE_VERSION, mandateId: dm.mandateId, agent: platformAddr, user: platformAddr,
           reasoning, actionType: "payment", target: "stripe", amount: AMOUNT,
           rationale: "Paid the invoice the user approved.",
           observed: { invoiceId: "inv_42" }, before: {}, after: {}, txDigests: [], timestampMs: Date.now(),
         },
       });
-      if (!proof?.blobId) throw new Error("anchor returned no blob");
-      break; // success
+      if (proof?.blobId) break;
     } catch (e) {
       lastErr = e;
-      await new Promise((r) => setTimeout(r, 3000 * (attempt + 1)));
     }
+    await new Promise((r) => setTimeout(r, 2500 * (attempt + 1)));
   }
-  if (!proof?.blobId) throw new Error(`the demo could not complete after retries: ${(lastErr as Error)?.message ?? "unknown"}`);
+  if (!proof?.blobId) throw new Error(`the anchor did not complete after retries: ${(lastErr as Error)?.message ?? "transient"}; run demo again`);
+  const m = dm;
 
   // 3. records + 4. verify: read it back and check it the way an auditor would.
   const records = await listRecords(sui, m.mandateId, 5);
@@ -716,4 +740,8 @@ server.listen(PORT, () => {
   console.log(`  memory:   ${memory.enabled ? "MemWal on Walrus — the agent carries its memory across sessions" : "off (set MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID)"}`);
   console.log(`  POST /claim { owner }   ->  spins up a personal agent that grants the owner`);
   console.log(`  POST /agent { mandateId, instruction }  ->  plans, trades on DeepBook, proves it`);
+  // Pre-warm the demo mandate so the first `demo` anchors to an already-settled mandate, no RPC lag.
+  ensureDemoMandate()
+    .then((d) => console.log(`  demo:     warm, mandate ${d.mandateId.slice(0, 12)}…`))
+    .catch((e) => console.error("  demo:     pre-warm failed (will create on first demo):", (e as Error).message));
 });

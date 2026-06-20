@@ -140,6 +140,14 @@ export function DevConsole() {
     return m;
   }
 
+  // Resolve which mandate a command targets: an explicit number wins; otherwise the one `demo` just
+  // created; otherwise the first in the list. Lets "grant 0x.." and "verify" work right after "demo".
+  async function resolveMandate(owner: string, num?: string): Promise<MandateRow | null> {
+    if (num) return pickMandate(owner, Number(num) - 1);
+    if (lastMandateRef.current) return { mandateId: lastMandateRef.current, agentAddress: "" };
+    return pickMandate(owner, 0);
+  }
+
   async function run(raw: string) {
     const [cmd, ...rest] = raw.trim().split(/\s+/);
     const arg = rest.join(" ");
@@ -223,7 +231,7 @@ export function DevConsole() {
         const parts = arg.split(/\s+/).filter(Boolean);
         const auditor = parts[0];
         if (!auditor || !auditor.startsWith("0x")) return add("err", "usage: grant <0xauditor> [#]");
-        const m = await pickMandate(owner, parts[1] ? Number(parts[1]) - 1 : 0);
+        const m = await resolveMandate(owner, parts[1]);
         if (!m) return;
         add("dim", `record::add_auditor — granting ${short(auditor)} read access to ${short(m.mandateId)}…`);
         const r = await api("/dev/grant", { owner, mandateId: m.mandateId, auditor });
@@ -233,7 +241,7 @@ export function DevConsole() {
       }
 
       case "revoke": {
-        const m = await pickMandate(owner, arg ? Number(arg) - 1 : 0);
+        const m = await resolveMandate(owner, arg);
         if (!m) return;
         add("dim", `mandate::revoke — revoking ${short(m.mandateId)}…`);
         const r = await api("/dev/revoke", { owner, mandateId: m.mandateId });
@@ -243,7 +251,7 @@ export function DevConsole() {
       }
 
       case "verify": {
-        const m = await pickMandate(owner, arg ? Number(arg) - 1 : 0);
+        const m = await resolveMandate(owner, arg);
         if (!m) return;
         add("dim", "reading from Walrus · decrypting via Seal · recomputing the hash…");
         const r = await api("/dev/verify", { owner, mandateId: m.mandateId });

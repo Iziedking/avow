@@ -9,7 +9,8 @@
 // Env: AVOW_KEY (platform key that funds plumbing), AGENT_PORT (default 8787).
 
 import { createServer, type IncomingMessage } from "node:http";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
+import { dirname } from "node:path";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 import {
@@ -61,7 +62,8 @@ const memory = createMemory();
 // wallet finds its agent (and its signer survives a server restart). The file holds agent secret
 // keys, so it lives under .firecrawl/ (gitignored); fine for a testnet demo, a real deployment
 // would keep these in a KMS.
-const AGENTS_FILE = ".firecrawl/agents.json";
+// Override with AVOW_AGENTS_FILE to point at a mounted volume in a container deployment.
+const AGENTS_FILE = process.env.AVOW_AGENTS_FILE ?? ".firecrawl/agents.json";
 type Agent = { kp: Ed25519Keypair; accessId: string; owner: string; managerId?: string };
 
 function loadAgents(): Map<string, Agent> {
@@ -84,6 +86,7 @@ const conversations = new Map<string, { role: "user" | "agent"; text: string }[]
 
 function saveAgents() {
   const arr = [...agents.entries()].map(([mandateId, e]) => ({ mandateId, secretKey: e.kp.getSecretKey(), accessId: e.accessId, owner: e.owner, managerId: e.managerId }));
+  mkdirSync(dirname(AGENTS_FILE), { recursive: true });
   writeFileSync(AGENTS_FILE, JSON.stringify(arr, null, 2));
 }
 
@@ -493,8 +496,12 @@ async function json(req: IncomingMessage) {
   return JSON.parse((await readBody(req)) || "{}");
 }
 
+// Lock this to your site in production, e.g. AVOW_CORS_ORIGIN=https://avow.site. Defaults to open
+// so local development just works.
+const CORS_ORIGIN = process.env.AVOW_CORS_ORIGIN ?? "*";
+
 const server = createServer(async (req, res) => {
-  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-origin", CORS_ORIGIN);
   res.setHeader("access-control-allow-headers", "content-type");
   res.setHeader("access-control-allow-methods", "POST, OPTIONS");
   const send = (code: number, body: unknown) => res.writeHead(code, { "content-type": "application/json" }).end(JSON.stringify(body));

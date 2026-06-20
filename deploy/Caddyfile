@@ -1,0 +1,5 @@
+# Caddy gets a real TLS cert automatically and proxies to the agent container.
+# Point an A record for api.avow.site at this VPS first.
+api.avow.site {
+	reverse_proxy agent:8787
+}

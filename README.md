@@ -324,10 +324,11 @@ mints the mandate and access for you, plus a runnable agent showing the call in 
 Everything the SDK does is also a terminal command, through `avow-cli`. Use it to set a
 mandate, anchor an action, and verify a record without writing any code.
 
-It is published to npm. Install it once and the `avow` command is available everywhere:
+It is published to the npm registry, so any package manager installs it. Install it once and the
+`avow` command is available everywhere:
 
 ```bash
-npm i -g avow-cli
+npm i -g avow-cli          # or: pnpm add -g avow-cli  ·  yarn global add avow-cli  ·  bun add -g avow-cli
 avow help
 ```
 

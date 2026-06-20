@@ -1,0 +1,19 @@
+# Keep the build context small and never copy secrets or build output into the image.
+node_modules
+**/node_modules
+dist
+**/dist
+contracts/build
+.git
+.github
+.firecrawl
+.env
+.env.*
+.claude
+memory
+*.log
+DEMO-SCRIPT.md
+PLAN.md
+TESTING.md
+MAINNET.md
+deploy

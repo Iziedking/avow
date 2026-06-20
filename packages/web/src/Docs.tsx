@@ -10,6 +10,34 @@ const SECTIONS: { id: Section; label: string }[] = [
   { id: "cli", label: "CLI" },
 ];
 
+// A tiny, dependency-free highlighter for the docs' TypeScript, shell and Move snippets. It colors
+// comments, strings, numbers and keywords; everything else stays default. Good enough for clean
+// example code, and it keeps the Walrus Site bundle lean.
+const CODE_KEYWORDS = new Set([
+  "import", "from", "export", "default", "const", "let", "var", "await", "async", "function",
+  "return", "new", "type", "interface", "class", "extends", "implements", "public", "private",
+  "readonly", "if", "else", "for", "while", "of", "in", "as", "typeof", "true", "false", "null",
+  "undefined", "void", "module", "fun", "struct", "use",
+]);
+
+function highlight(code: string): ReactNode[] {
+  const re =
+    /(\/\/[^\n]*|#[^\n]*)|("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|`(?:[^`\\]|\\.)*`)|(\b0x[0-9a-fA-F]+\b|\b\d[\d_]*n?\b)|([A-Za-z_$][\w$]*)|(\s+|[^\sA-Za-z_$0-9"'`]+)/g;
+  const out: ReactNode[] = [];
+  let m: RegExpExecArray | null;
+  let k = 0;
+  while ((m = re.exec(code)) !== null) {
+    if (m[1]) out.push(<span key={k++} className="tk-com">{m[1]}</span>);
+    else if (m[2]) out.push(<span key={k++} className="tk-str">{m[2]}</span>);
+    else if (m[3]) out.push(<span key={k++} className="tk-num">{m[3]}</span>);
+    else if (m[4]) {
+      if (CODE_KEYWORDS.has(m[4])) out.push(<span key={k++} className="tk-kw">{m[4]}</span>);
+      else out.push(m[4]);
+    } else out.push(m[5]);
+  }
+  return out;
+}
+
 function CodeBlock({ code, caption }: { code: string; caption?: string }) {
   const [copied, setCopied] = useState(false);
   const copy = async () => {
@@ -30,7 +58,49 @@ function CodeBlock({ code, caption }: { code: string; caption?: string }) {
         </button>
       </div>
       <pre>
-        <code>{code}</code>
+        <code>{highlight(code)}</code>
+      </pre>
+    </div>
+  );
+}
+
+// Install snippet with a package-manager switch (npm / pnpm / yarn / bun). The package lives on the
+// one npm registry; this just shows each tool's install command.
+const PM_ORDER = ["npm", "pnpm", "yarn", "bun"] as const;
+type Pm = (typeof PM_ORDER)[number];
+
+function InstallBlock({ pkg, global = false }: { pkg: string; global?: boolean }) {
+  const cmds: Record<Pm, string> = global
+    ? { npm: `npm i -g ${pkg}`, pnpm: `pnpm add -g ${pkg}`, yarn: `yarn global add ${pkg}`, bun: `bun add -g ${pkg}` }
+    : { npm: `npm i ${pkg}`, pnpm: `pnpm add ${pkg}`, yarn: `yarn add ${pkg}`, bun: `bun add ${pkg}` };
+  const [pm, setPm] = useState<Pm>("npm");
+  const [copied, setCopied] = useState(false);
+  const cmd = cmds[pm];
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(cmd);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
+    } catch {
+      /* clipboard unavailable */
+    }
+  };
+  return (
+    <div className="doc-code">
+      <div className="doc-code-bar">
+        <div className="pm-tabs">
+          {PM_ORDER.map((id) => (
+            <button key={id} className={`pm-tab${pm === id ? " is-on" : ""}`} onClick={() => setPm(id)}>
+              {id}
+            </button>
+          ))}
+        </div>
+        <button className="doc-copy" onClick={copy} aria-label="Copy install command">
+          {copied ? "copied" : "copy"}
+        </button>
+      </div>
+      <pre>
+        <code>{highlight(cmd)}</code>
       </pre>
     </div>
   );
@@ -496,18 +566,18 @@ function Sdk() {
     <article className="doc-article">
       <h2>Build an agent with the SDK</h2>
       <p>
-        <code>avow-sdk</code> turns any agent — a new one, or one you already run — into a stateful,
+        <code>avow-sdk</code> turns any agent, a new one, or one you already run, into a stateful,
         verifiable one. Two halves, one install: <strong>memory</strong> it carries everywhere
         (<code>createMemory</code>), and <strong>proof</strong> of everything it did and why
         (<code>anchor</code> / <code>verify</code>). Your model and tools stay yours; Avow wraps the
         memory and the proof around them. Plain TypeScript, nothing to stand up.
       </p>
 
-      <CodeBlock caption="install" code={`npm i avow-sdk`} />
+      <InstallBlock pkg="avow-sdk" />
 
       <h3>1 · Set the mandate (once)</h3>
       <p>
-        The owner mints a mandate — the agent's rules — and an access object, the sealed space its
+        The owner mints a mandate, the agent's rules, and an access object, the sealed space its
         evidence lives in. <code>createMandate</code> does both and returns their ids.
       </p>
       <CodeBlock
@@ -529,7 +599,7 @@ const created = await createMandate(sui, ownerKeypair, {
 
       <h3>2 · Give it memory it carries everywhere</h3>
       <p>
-        One call, <code>createMemory()</code>, and the agent remembers across sessions — log out,
+        One call, <code>createMemory()</code>, and the agent remembers across sessions, log out,
         log back in, move to another machine, and the context follows it, on Walrus, scoped per
         user. Recall before it acts; remember after, so it builds over time. Memory is a no-op until
         you set <code>MEMWAL_PRIVATE_KEY</code> and <code>MEMWAL_ACCOUNT_ID</code> (from
@@ -541,7 +611,7 @@ const created = await createMandate(sui, ownerKeypair, {
 
 const memory = createMemory();   // reads MEMWAL_PRIVATE_KEY + MEMWAL_ACCOUNT_ID
 
-// before acting, pull back what's relevant — even after logout, on another machine
+// before acting, pull back what's relevant, even after logout, on another machine
 const context = await memory.recall(user, "what's my position, what did I buy?");
 // -> ["Bought 0.3 WAL at 0.71 SUI.", ...]
 
@@ -600,7 +670,7 @@ const proof = await anchor({
 // proof.anchorDigest     the Sui transaction that anchored it`}
       />
 
-      <h3>4 · Verify — anyone with access, trustlessly</h3>
+      <h3>4 · Verify, anyone with access, trustlessly</h3>
       <p>
         Reading is the reverse. <code>listRecords</code> gives you the anchored records,{" "}
         <code>createSession</code> proves who you are to the Seal key servers, and{" "}
@@ -634,14 +704,14 @@ const result = await verify({
       <h3>5 · The whole loop</h3>
       <p>
         Put together, every turn the agent recalls, decides, acts, proves, and remembers. That is an
-        Avow agent: stateful and provable, end to end — and the model and tools in the middle are
+        Avow agent: stateful and provable, end to end, and the model and tools in the middle are
         still entirely yours.
       </p>
       <CodeBlock
         caption="agent.ts"
         code={`// each turn the agent runs:
 const context = await memory.recall(user, instruction);    // 1. remember the past
-const plan    = await yourModel(instruction, context);     // 2. decide — your agent, your model
+const plan    = await yourModel(instruction, context);     // 2. decide, your agent, your model
 const digest  = await plan.execute();                      // 3. act for real
 
 await anchor({ suiClient, sealClient, walrusClient, signer: agent,
@@ -667,7 +737,7 @@ function Cli() {
         Everything the SDK does is also a terminal command, through <code>avow-cli</code>. No code
         required. Install it once and the <code>avow</code> command is everywhere.
       </p>
-      <CodeBlock caption="install" code={`npm i -g avow-cli`} />
+      <InstallBlock pkg="avow-cli" global />
 
       <h3>Two settings it needs</h3>
       <p>
@@ -693,7 +763,7 @@ export AVOW_MANDATE_ID=0x...  AVOW_ACCESS_ID=0x...`}
       <h3>Authorize an auditor</h3>
       <p>
         You hold the mandate cap, so you decide who else may read the evidence. <code>grant</code>{" "}
-        adds an auditor wallet as a reader — it finds the access and your cap for you. That wallet
+        adds an auditor wallet as a reader, it finds the access and your cap for you. That wallet
         can then decrypt and verify the records itself, and nothing more.
       </p>
       <CodeBlock caption="grant" code={`avow grant --mandate $AVOW_MANDATE_ID --auditor 0xAUDITOR`} />

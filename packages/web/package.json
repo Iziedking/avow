@@ -1,7 +1,7 @@
 {
   "name": "@avow/web",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Avow verification dashboard: a Walrus Site where an agent's record appears and verifies in seconds.",
   "type": "module",
   "scripts": {

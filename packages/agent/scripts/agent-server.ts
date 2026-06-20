@@ -147,13 +147,15 @@ async function ownerMandates(owner: string): Promise<{ mandateId: string; agentA
 // The public RPC lags a tx or two behind, so back-to-back signs on one gas coin race
 // ("unavailable for consumption" / "needs to be rebuilt"). Retry the call with backoff. Used to
 // wrap SDK functions (createMandate, anchor) that sign internally and so can't use execWithRetry.
-async function withRetry<T>(fn: () => Promise<T>, tries = 6): Promise<T> {
+async function withRetry<T>(fn: () => Promise<T>, tries = 7): Promise<T> {
   for (let i = 0; i < tries; i++) {
     try {
       return await fn();
     } catch (e) {
       const msg = (e as Error).message;
-      if (i < tries - 1 && /unavailable for consumption|needs to be rebuilt|reserved|equivocat|not available|conflicting/i.test(msg)) {
+      // Gas-coin version races AND read-after-write lag (a just-created object the node has not
+      // indexed yet shows as "does not exist"). Both clear with a short wait.
+      if (i < tries - 1 && /unavailable for consumption|needs to be rebuilt|reserved|equivocat|not available|conflicting|does not exist/i.test(msg)) {
         await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
         continue;
       }
@@ -161,6 +163,20 @@ async function withRetry<T>(fn: () => Promise<T>, tries = 6): Promise<T> {
     }
   }
   throw new Error("retries exhausted");
+}
+
+// Wait until an object is visible on the RPC node, so the next tx that references it does not race
+// the node's indexing ("does not exist"). Best-effort, with backoff.
+async function waitForObject(id: string, tries = 8): Promise<void> {
+  for (let i = 0; i < tries; i++) {
+    try {
+      const o = await sui.getObject({ id });
+      if (o.data) return;
+    } catch {
+      /* not visible yet */
+    }
+    await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+  }
 }
 
 async function capIdForAgent(agentAddr: string, mandateId: string): Promise<string> {
@@ -286,6 +302,9 @@ async function devDemo() {
     dailyCap: 100_000n,
     expiryEpoch: 100000n,
   }));
+  // Let the node index the new mandate and access before the anchor references them.
+  await waitForObject(m.mandateId);
+  await waitForObject(m.accessId);
 
   // 2. anchor: capture the reasoning, seal it, stamp it on chain.
   const reasoning = new Reasoning("Pay the invoice the user approved")
@@ -302,6 +321,7 @@ async function devDemo() {
       observed: { invoiceId: "inv_42" }, before: {}, after: {}, txDigests: [], timestampMs: Date.now(),
     },
   }));
+  if (!proof?.blobId) throw new Error("the anchor did not complete (a transient Walrus or RPC hiccup); run demo again");
 
   // 3. records + 4. verify: read it back and check it the way an auditor would.
   const records = await listRecords(sui, m.mandateId, 5);

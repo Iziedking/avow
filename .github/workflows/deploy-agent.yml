@@ -26,6 +26,9 @@ jobs:
     permissions:
       contents: read
       packages: write
+    # Surface the VPS host so the rollout step can skip cleanly until the VPS secrets are set.
+    env:
+      VPS_HOST: ${{ secrets.VPS_HOST }}
     steps:
       - uses: actions/checkout@v4
 
@@ -52,7 +55,9 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      # Skips until the VPS secrets exist, so the image still builds and pushes in the meantime.
       - name: Roll out on the VPS
+        if: env.VPS_HOST != ''
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}

@@ -57,7 +57,7 @@ export function makeDB(address: string, managerAddress?: string): DeepBookClient
 }
 
 // Sign + execute, retrying transient gas-object version races (the SDK asks to "rebuild").
-export async function execWithRetry(build: () => Promise<Transaction>, signer: Ed25519Keypair, tries = 5) {
+export async function execWithRetry(build: () => Promise<Transaction>, signer: Ed25519Keypair, tries = 6) {
   for (let i = 0; i < tries; i++) {
     try {
       const res = await sui.signAndExecuteTransaction({ transaction: await build(), signer, options: { showEffects: true } });
@@ -66,8 +66,9 @@ export async function execWithRetry(build: () => Promise<Transaction>, signer: E
       return res;
     } catch (e) {
       const msg = (e as Error).message;
-      if (i < tries - 1 && /unavailable for consumption|needs to be rebuilt|equivocat|reserved|not available/i.test(msg)) {
-        await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+      // Also retry read-after-write lag on the public RPC ("...does not exist" for a just-created object).
+      if (i < tries - 1 && /unavailable for consumption|needs to be rebuilt|equivocat|reserved|not available|does not exist/i.test(msg)) {
+        await new Promise((r) => setTimeout(r, 2000 * (i + 1)));
         continue;
       }
       throw e;

@@ -406,7 +406,11 @@ async function claim(owner: string) {
   await fundPlumbing(agentAddr);
 
   // The agent creates its own mandate + evidence access.
-  const m = await createMandate(sui, kp, { agent: agentAddr, perMoveCap: PER_MOVE_CAP, dailyCap: DAILY_CAP, expiryEpoch: 100000n });
+  const m = await withRetry(() => createMandate(sui, kp, { agent: agentAddr, perMoveCap: PER_MOVE_CAP, dailyCap: DAILY_CAP, expiryEpoch: 100000n }));
+  // Let the new access and cap settle on the RPC before the grant references them (the public
+  // testnet RPC can briefly say a just-created object "does not exist").
+  await waitForObject(m.accessId);
+  await waitForObject(m.capId);
 
   // ...and grants the connecting wallet read access, so it can verify on Avow.
   await execWithRetry(async () => {

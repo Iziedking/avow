@@ -12,8 +12,12 @@ import { WalrusClient } from "@mysten/walrus";
 import { NETWORK, SEAL_KEY_SERVERS, WALRUS_UPLOAD_RELAY, WALRUS_TIP_MAX_MIST } from "./config";
 
 export function getSuiClient(): SuiJsonRpcClient {
+  // Pin a single, consistent RPC with AVOW_SUI_RPC. The default public endpoint is load-balanced
+  // across nodes that lag each other, which makes read-after-write and gas-coin versions race on a
+  // server that fires several transactions quickly. A single node keeps those consistent.
+  const override = typeof process !== "undefined" && process.env ? process.env.AVOW_SUI_RPC : undefined;
   return new SuiJsonRpcClient({
-    url: getJsonRpcFullnodeUrl(NETWORK),
+    url: override || getJsonRpcFullnodeUrl(NETWORK),
     network: NETWORK,
   });
 }

@@ -471,9 +471,11 @@ const FAQS: { q: string; a: ReactNode }[] = [
     q: "What can Avow do?",
     a: (
       <>
-        It proves an agent's actions are correct and within your limits, an action that broke your
-        rules could never have been recorded in the first place. It stores every action and its full
-        reasoning durably on Walrus, encrypted per user with Seal. It gives the agent verifiable{" "}
+        It records every action an agent takes and stamps each one, on chain, with whether it stayed
+        inside your limits, computed by the contract so the agent cannot fake it. Nothing is dropped:
+        the actions that broke the rules are captured and flagged out of bounds too, so you can see
+        exactly where an agent slipped and adjust. It stores every action and its full reasoning
+        durably on Walrus, encrypted per user with Seal. It gives the agent verifiable{" "}
         <strong>memory</strong> it reads and builds on across sessions. And one shared agent can
         serve many people, each decrypting only their own history, nobody else's.
       </>
@@ -485,9 +487,9 @@ const FAQS: { q: string; a: ReactNode }[] = [
       <>
         Two calls. After your agent acts, call <code>anchor(action)</code>; to check a record, call{" "}
         <code>verify(record)</code>. Set a <strong>mandate</strong> first, the rules (per-action and
-        daily caps, expiry, the agent's address), and the contract only records actions inside it.
-        Prefer no code? Use the CLI, or the live console: connect a wallet, claim a DeepBook agent,
-        fund it, and instruct it in plain English.
+        daily caps, expiry, the agent's address), and every action is recorded against it, marked on
+        chain as within the rules or out of bounds. Prefer no code? Use the CLI, or the live console:
+        connect a wallet, claim a DeepBook agent, fund it, and instruct it in plain English.
       </>
     ),
   },

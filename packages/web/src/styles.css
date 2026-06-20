@@ -1435,6 +1435,13 @@ input:focus {
   border: 1px solid var(--green-dim);
 }
 
+.verdict.is-flagged {
+  border-color: var(--amber);
+}
+.verdict.is-flagged .verdict-mark {
+  color: var(--amber);
+}
+
 .verdict-mark {
   flex: none;
   font-size: 20px;

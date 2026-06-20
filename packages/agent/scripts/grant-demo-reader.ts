@@ -10,8 +10,8 @@ import { Transaction } from "@mysten/sui/transactions";
 import { getSuiClient, PACKAGE_ID, NETWORK } from "avow-sdk";
 
 const DEMO_MANDATES = [
-  // The multi-user bill payer on the v2 (per-user reasoning) package.
-  "0x80d5da99a1d51ed92fbc9cee907ce9b7c7c666b54751ec527108481984a7f32c",
+  // The multi-user bill payer on the forensic-log package.
+  "0xed07c664a788e3912570d4e268fb4c8e04cdebb01fb020b5a4dff1ace2654b25",
 ];
 
 function loadOwner(): Ed25519Keypair {

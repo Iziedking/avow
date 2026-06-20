@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { background: #000; }
+      .wrap { position: relative; width: max-content; }
+      img { display: block; width: 100%; }
+
+      /* The explanation, pinned over the image like a terminal comment. */
+      .caption {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        padding: 34px 48px 40px;
+        background: linear-gradient(180deg, transparent, rgba(4, 8, 6, 0.86) 34%, rgba(3, 6, 4, 0.97));
+        font-family: "IBM Plex Mono", monospace;
+        display: flex;
+        align-items: baseline;
+        gap: 16px;
+      }
+      .slash {
+        color: #5fd08a;
+        font-weight: 600;
+        font-size: 30px;
+        flex: none;
+        text-shadow: 0 0 18px rgba(95, 208, 138, 0.5);
+      }
+      .cap {
+        color: #eaf3ee;
+        font-size: 27px;
+        line-height: 1.5;
+        font-weight: 500;
+        letter-spacing: 0.2px;
+        max-width: 1300px;
+      }
+      .cap b { color: #74e09c; font-weight: 600; }
+
+      /* A small label so it reads as a deliberate annotation. */
+      .tag {
+        position: absolute;
+        top: 26px;
+        left: 48px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 16px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        color: #5fd08a;
+        background: rgba(4, 10, 7, 0.7);
+        border: 1px solid rgba(95, 208, 138, 0.4);
+        border-radius: 5px;
+        padding: 6px 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <span class="tag" id="tag"></span>
+      <img id="shot" />
+      <div class="caption"><span class="slash">//</span><span class="cap" id="cap"></span></div>
+    </div>
+    <script>
+      const p = new URLSearchParams(location.search);
+      document.getElementById("shot").src = p.get("img");
+      document.getElementById("tag").textContent = p.get("tag") || "avow";
+      document.getElementById("cap").innerHTML = p.get("cap") || "";
+    </script>
+  </body>
+</html>

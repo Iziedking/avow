@@ -880,18 +880,30 @@ export function App() {
         </div>
       </section>
 
-      {mandate && shownRecords.length > 0 && (
-        <div className="verdict hud">
-          <span className="verdict-mark">✓</span>
-          <p>
-            <strong>Every action your agent took stayed within your limits.</strong> All {moves}{" "}
-            were inside the {money(mandate.perMoveCap.toString(), unitType, dev)} per-action limit you set. Avow checks that
-            limit the moment each action is recorded, so one that broke your rules could never have
-            been saved here. Open any action below to see exactly what it did, and why, you never
-            have to take its word for it.
-          </p>
-        </div>
-      )}
+      {mandate && shownRecords.length > 0 && (() => {
+        const flagged = shownRecords.filter((r) => r.withinMandate === false).length;
+        return flagged === 0 ? (
+          <div className="verdict hud">
+            <span className="verdict-mark">✓</span>
+            <p>
+              <strong>Every action your agent took stayed within your limits.</strong> All {moves}{" "}
+              were inside the {money(mandate.perMoveCap.toString(), unitType, dev)} per-action limit you set. Avow stamps
+              each action's compliance on chain the moment it is recorded, computed by the contract,
+              so the verdict cannot be faked. Open any action below to see exactly what it did, and why.
+            </p>
+          </div>
+        ) : (
+          <div className="verdict hud is-flagged">
+            <span className="verdict-mark">⚠</span>
+            <p>
+              <strong>{flagged} of {moves} actions {flagged === 1 ? "was" : "were"} flagged out of bounds.</strong> Avow
+              records every action and stamps each one on chain as within the rules or out of bounds,
+              computed by the contract so it cannot be faked. Nothing is hidden: open a flagged action
+              below to see exactly what the agent did and where it broke the rules.
+            </p>
+          </div>
+        );
+      })()}
 
       <AgentRun
         key={`${mandateId}:${viewIndex}`}

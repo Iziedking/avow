@@ -1,5 +1,6 @@
-# Caddy gets a real TLS cert automatically and proxies to the agent container.
-# Point an A record for api.avow.site at this VPS first.
+# Shared-VPS setup: do NOT run this as a standalone Caddy. Add this one block to the Caddy you
+# already run (the arcrun Caddy), then reload it. Caddy provisions TLS for api.avow.site
+# automatically, and reverse-proxies to the avow-agent container on the shared Docker network.
 api.avow.site {
-	reverse_proxy agent:8787
+	reverse_proxy avow-agent:8787
 }

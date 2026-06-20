@@ -1,30 +1,24 @@
-# Avow backend on a VPS: the agent server behind Caddy, which terminates TLS for api.avow.site.
-# Put this file, Caddyfile, and a filled-in .env (see .env.example) in the same folder on the VPS,
-# log in to the image registry once, then run: docker compose up -d
+# Avow backend on a shared VPS that already runs Caddy. We do NOT run our own Caddy here (it would
+# fight the existing one for ports 80/443). Instead the agent joins the existing Caddy's Docker
+# network, and you add one site block to that Caddy pointing api.avow.site -> avow-agent:8787.
+#
+# Put this file and a filled-in .env (see .env.example) in ~/avow-deploy on the VPS, then:
+#   docker compose pull && docker compose up -d
 services:
   agent:
     image: ghcr.io/iziedking/avow-agent:latest
+    container_name: avow-agent # stable name so the existing Caddy can reverse_proxy to it
     restart: unless-stopped
     env_file: .env
     volumes:
       - agent-data:/data # claimed-agent state survives restarts
-    expose:
-      - "8787" # internal only; Caddy proxies to it
+    networks:
+      - proxy # the existing Caddy's network (set its real name below)
 
-  caddy:
-    image: caddy:2
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data
-      - caddy-config:/config
-    depends_on:
-      - agent
+networks:
+  proxy:
+    external: true
+    name: deploy_default # the existing Caddy's network on this VPS
 
 volumes:
   agent-data:
-  caddy-data:
-  caddy-config:

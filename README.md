@@ -6,6 +6,8 @@
 
 **Proof, not trust.**
 
+**demo:** https://youtu.be/PylK749BK0M?si=2EpKKSn1DUpRcBB3
+
 Avow is the verifiable trust and memory layer for AI agents on Sui. Any agent, a trader, an
 assistant, a research bot, a bill payer, plugs in and gains two things: a memory it carries
 everywhere, and proof of everything it did and why. Agents are starting to act on our behalf, and
